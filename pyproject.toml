@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "nanogpt"
+version = "1.0.0"
+description = "Knock-off Andrej Karpathy's nanoGPT"
+authors = ["Andrei.Aksionov"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+ipykernel = "~6.20.1"
+loguru = "~0.6.0"
+matplotlib = "~3.6.3"
+numpy = "~1.24.1"
+omegaconf = "~2.3.0"
+pandas = "~1.5.2"
+python = "~3.10.8"
+requests = "~2.28.1"
+tensorboard = "~2.11.0"
+torch = [
+  {version = "~1.12.0+cpu", platform = "darwin"},
+  {version = "~1.12.0", platform = "linux"},
+]
+tqdm = "~4.64.1"
+
+[tool.poetry.group.dev.dependencies]
+black = {version = "*", extras = ["jupyter"]}
+flake8 = "*"
+flake8-absolute-import = "*"
+flake8-annotations = "*"
+flake8-bugbear = "*"
+flake8-commas = "*"
+flake8-comprehensions = "*"
+flake8-docstrings = "*"
+flake8-eradicate = "*"
+flake8-expression-complexity = "*"
+flake8-isort = "*"
+flake8-print = "*"
+flake8-pytest-style = "*"
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line_length = 120
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
