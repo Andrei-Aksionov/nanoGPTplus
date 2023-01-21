@@ -1,0 +1,9 @@
+data:
+  path:
+    raw: data/raw/
+    interim: data/interim/
+
+datasets:
+  tiny_shakespeare:
+    url: https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
+    folder: ${data.path.raw}/tiny_shakespeare
