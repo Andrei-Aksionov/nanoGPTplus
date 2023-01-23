@@ -135,6 +135,9 @@ dmypy.json
 # Models
 /models
 
+# Temporary notebooks
+notebooks/**/_*.ipynb
+
 # VSCode
 .vscode
 .DS_STORE
