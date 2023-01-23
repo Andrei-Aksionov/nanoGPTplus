@@ -33,10 +33,11 @@ class Dataset:
         # train and test splits
         self.data = torch.tensor(self.encode(dataset), dtype=torch.long)
         test_split = int(len(self.data) * 0.9)
+        print(f"Test split: {test_split}")
         self.train_data = self.data[:test_split]
         self.test_data = self.data[test_split:]
 
-        self.block_size = config.model.small.batch_size
+        self.block_size = config.model.small.block_size
         self.batch_size = config.model.small.batch_size
 
     def encode(self, text: str) -> list[int]:
@@ -52,11 +53,11 @@ class Dataset:
         data = self.train_data if mode == "train" else self.test_data
 
         # generate random indices
-        indices = torch.randint(len(self.data) - self.block_size, (self.batch_size,))
+        indices = torch.randint(len(data) - self.block_size, (self.batch_size,))
 
         # generate batches
-        x = torch.stack([self.data[idx : idx + self.block_size] for idx in indices])
+        x = torch.stack([data[idx : idx + self.block_size] for idx in indices])
         # targets are inputs with shift of 1 - predict the next character
-        y = torch.stack([self.data[idx + 1 : idx + self.block_size + 1] for idx in indices])
+        y = torch.stack([data[idx + 1 : idx + self.block_size + 1] for idx in indices])
 
         return x, y

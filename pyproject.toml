@@ -37,6 +37,7 @@ flake8-expression-complexity = "*"
 flake8-isort = "*"
 flake8-print = "*"
 flake8-pytest-style = "*"
+ipywidgets = "~8.0.4"
 
 [tool.isort]
 profile = "black"
