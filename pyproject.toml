@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "nanogpt"
-version = "1.0.0"
-description = "Knock-off Andrej Karpathy's nanoGPT"
 authors = ["Andrei.Aksionov"]
+description = "Knock-off Andrej Karpathy's nanoGPT"
 license = "MIT"
-readme = "README.md"
+name = "nanogpt"
 packages = [{include = "src"}]
+readme = "README.md"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 ipykernel = "~6.20.1"
@@ -45,5 +45,5 @@ profile = "black"
 line_length = 120
 
 [build-system]
-requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
