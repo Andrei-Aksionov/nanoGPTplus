@@ -11,7 +11,8 @@ class BigramLanguageModel(nn.Module):
         # that why it has square size
         self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
 
-    def forward(self, idx, targets=None) -> tuple[torch.Tensor, None | torch.Tensor]:
+    # forward method should only return logits, not loss
+    def forward1(self, idx, targets=None) -> tuple[torch.Tensor, None | torch.Tensor]:
 
         # idx and target are both (B, T) tensor of integers
         # where B - batch size, T - num steps (context size)
@@ -31,11 +32,15 @@ class BigramLanguageModel(nn.Module):
 
         return logits, loss
 
+    def forward(self, idx) -> torch.Tensor:
+        return self.token_embedding_table(idx)
+
     def generate(self, idx, max_new_tokens):
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
             # get the predictions
-            logits, loss = self(idx)  # (B, T, C)
+            # logits, loss = self(idx)  # (B, T, C)
+            logits = self(idx)  # (B, T, C)
             # focus only on the last time step
             logits = logits[:, -1, :]  # becomes (B, C)
             # apply softmax on the predictions to get probabilities

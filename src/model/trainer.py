@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 
 
@@ -9,46 +10,61 @@ class Trainer:
         optimizer,
         train_dataloader,
         test_dataloader,
-        eval_interval: int,
-        eval_iters: int,
-        loss=None,
+        loss,
     ) -> None:
         super().__init__()
         self.model = model
         self.optimizer = optimizer
-        self.train_dataloader = iter(train_dataloader)
-        self.test_dataloader = iter(test_dataloader)
-        self.eval_interval = eval_interval
-        self.eval_iters = eval_iters
+        self.train_dataloader = train_dataloader
+        self.test_dataloader = test_dataloader
+        assert loss is F.cross_entropy, "So far only cross-entropy is supported"
         self.loss = loss
 
-    def train(self, num_iter: int):
+    def train(self, epochs: int):
 
-        # TODO: transform from iter to epochs
+        for epoch in range(epochs):
 
-        loop = tqdm(range(num_iter), ascii=True)
+            print(f" Epoch: {epoch} ".center(40, "="))
 
-        self.model.train()
-        for iter in loop:
+            train_loop = tqdm(self.train_dataloader, ascii=True)
+            self.model.train()
+            batch_loss = torch.tensor(0.0)
+            for idx, batch in enumerate(train_loop):
+                # TODO: maybe not x and y, but inputs and targets?
+                x, y = batch
+                logits = self.model(x)
 
-            xb, yb = next(self.train_dataloader)
+                B, T, C = logits.shape
+                loss = self.loss(
+                    logits.view(B * T, C),
+                    y.view(B * T),
+                )
 
-            _, loss = self.model(xb, yb)
+                batch_loss += loss
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad(set_to_none=True)
 
-            loss.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad(set_to_none=True)
+                if idx % 100 == 0:
+                    train_loop.set_postfix(train_loss=batch_loss.item() / 100)
+                    batch_loss = 0
 
-            if iter % self.eval_interval == 0:
-                self.model.eval()
-                with torch.no_grad():
-                    test_loss_sum = 0
-                    for _ in range(self.eval_iters):
-                        x_test, y_test = next(self.test_dataloader)
-                        _, loss = self.model(x_test, y_test)
-                        test_loss_sum += loss.item()
-                    test_loss = test_loss_sum / self.eval_iters
+            self.model.eval()
+            test_loss = torch.tensor(0.0)
+            test_loop = tqdm(self.test_dataloader, ascii=True)
+            for idx, batch in enumerate(test_loop):
+                x_test, y_test = batch
+                logits = self.model(x_test)
+                B, T, C = logits.shape
+                loss = self.loss(
+                    logits.view(B * T, C),
+                    y_test.view(B * T),
+                )
+                test_loss += loss
 
-            loop.set_postfix(loss=loss.item(), test_loss=test_loss)
+                if idx % 100 == 0:
+                    test_loop.set_postfix(test_loss=test_loss.item() / 100)
+                    test_loss = 0
 
-        self.final_loss = loss.item()
+            train_loop.close()
+            test_loop.close()
