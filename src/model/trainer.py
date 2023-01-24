@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+from src.utils.device import get_device
+
 
 class Trainer:
     def __init__(
@@ -13,12 +15,17 @@ class Trainer:
         loss,
     ) -> None:
         super().__init__()
-        self.model = model
+        self.model = model.to(get_device())
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
         assert loss is F.cross_entropy, "So far only cross-entropy is supported"
         self.loss = loss
+
+    def mode_batch_to(self, batch, device: torch.device = None):
+        if not device:
+            device = next(self.model.parameters()).device
+        return [x.to(device) for x in batch]
 
     def train(self, epochs: int):
 
@@ -31,13 +38,13 @@ class Trainer:
             batch_loss = torch.tensor(0.0)
             for idx, batch in enumerate(train_loop):
                 # TODO: maybe not x and y, but inputs and targets?
-                x, y = batch
-                logits = self.model(x)
+                x_train, y_train = self.mode_batch_to(batch)
+                logits = self.model(x_train)
 
                 B, T, C = logits.shape
                 loss = self.loss(
                     logits.view(B * T, C),
-                    y.view(B * T),
+                    y_train.view(B * T),
                 )
 
                 batch_loss += loss
@@ -53,7 +60,7 @@ class Trainer:
             test_loss = torch.tensor(0.0)
             test_loop = tqdm(self.test_dataloader, ascii=True)
             for idx, batch in enumerate(test_loop):
-                x_test, y_test = batch
+                x_test, y_test = self.mode_batch_to(batch)
                 logits = self.model(x_test)
                 B, T, C = logits.shape
                 loss = self.loss(
