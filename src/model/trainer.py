@@ -1,28 +1,54 @@
+import torch
 from tqdm import tqdm
 
 
 class Trainer:
-    def __init__(self, model, optimizer, dataset, loss=None) -> None:
+    def __init__(
+        self,
+        model,
+        optimizer,
+        train_dataloader,
+        test_dataloader,
+        eval_interval: int,
+        eval_iters: int,
+        loss=None,
+    ) -> None:
         super().__init__()
         self.model = model
         self.optimizer = optimizer
+        self.train_dataloader = iter(train_dataloader)
+        self.test_dataloader = iter(test_dataloader)
+        self.eval_interval = eval_interval
+        self.eval_iters = eval_iters
         self.loss = loss
-        self.dataset = dataset
 
     def train(self, num_iter: int):
 
+        # TODO: transform from iter to epochs
+
         loop = tqdm(range(num_iter), ascii=True)
 
-        for _ in loop:
+        self.model.train()
+        for iter in loop:
 
-            xb, yb = self.dataset.get_batch(mode="train")
+            xb, yb = next(self.train_dataloader)
 
-            logits, loss = self.model(xb, yb)
+            _, loss = self.model(xb, yb)
 
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad(set_to_none=True)
 
-            loop.set_postfix(loss=loss.item())
+            if iter % self.eval_interval == 0:
+                self.model.eval()
+                with torch.no_grad():
+                    test_loss_sum = 0
+                    for _ in range(self.eval_iters):
+                        x_test, y_test = next(self.test_dataloader)
+                        _, loss = self.model(x_test, y_test)
+                        test_loss_sum += loss.item()
+                    test_loss = test_loss_sum / self.eval_iters
+
+            loop.set_postfix(loss=loss.item(), test_loss=test_loss)
 
         self.final_loss = loss.item()

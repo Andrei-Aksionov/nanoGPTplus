@@ -3,7 +3,6 @@ class CharTokenizer:
         # get all unique characters and count them
         self.vocab = sorted(set(text))
         self.vocab_size = len(self.vocab)
-
         # create mapping from characters to integers and inverse
         self.stoi = {char: idx for idx, char in enumerate(self.vocab)}
         self.itos = dict(enumerate(self.vocab))
