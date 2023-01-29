@@ -15,22 +15,27 @@ from src.utils.seed import set_seed
 
 def train():
 
+    # set seed for reproducibility
     set_seed(config.model.seed)
+    # assign model's config to a variable
+    model_config = config.model.small
 
+    # Step 1: Load the data
     logger.debug("Loading the data...")
     data_path = Path.cwd() / config.datasets.tiny_shakespeare.file_path
     with open(data_path, "r") as fin:
         text = fin.read()
     logger.debug("Data is loaded.")
 
+    # Step 2: Prepare tokenizer and tokenize the data
     logger.debug("Starting tokenizing...")
     tokenizer = CharTokenizer(text)
     data = torch.tensor(tokenizer.encode(text))
     logger.debug("Tokenizing is done.")
-    train_data, test_data = train_test_split(data, 0.9)
 
+    # Step 3: Create data loaders
     logger.debug("Preparing data loaders...")
-    model_config = config.model.small
+    train_data, test_data = train_test_split(data, 0.9)
     block_size = model_config.block_size
     batch_size = model_config.batch_size
     train_dataset = Dataset(train_data, block_size)
@@ -39,6 +44,7 @@ def train():
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=1)
     logger.debug("Data loaders are prepared.")
 
+    # Step 4: Train the model
     logger.debug("Staring training...")
     model = BigramLanguageModel(vocab_size=tokenizer.vocab_size)
     optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)

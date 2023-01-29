@@ -9,13 +9,7 @@ from src.utils.device import get_device
 
 class Trainer:
     def __init__(
-        self,
-        model,
-        optimizer,
-        train_dataloader,
-        test_dataloader,
-        loss=None,
-        tqdm_update_interval: int = 100,
+        self, model, optimizer, train_dataloader, test_dataloader, loss=None, tqdm_update_interval: int = 100
     ) -> None:
         super().__init__()
         self.model = model.to(get_device())
@@ -39,27 +33,21 @@ class Trainer:
 
     def train(self, epochs: int):
 
-        tqdm_config = {
-            "ascii": True,
-            "delay": 0.1,
-        }
-
         for epoch in range(epochs):
 
             tqdm.write(f" Epoch: {epoch} ".center(40, "="))
 
-            train_loop = tqdm(self.train_dataloader, desc="Training", **tqdm_config)
-            eval_loop = tqdm(self.test_dataloader, desc="Evaluating", **tqdm_config)
-
-            for mode, loop in zip(
+            for mode, dataloader in zip(
                 ["train", "eval"],
-                [train_loop, eval_loop],
+                [self.train_dataloader, self.test_dataloader],
             ):
 
                 if mode == "train":
                     self.model.train()
                 else:
                     self.model.eval()
+
+                loop = tqdm(dataloader, desc=mode, ascii=True)
 
                 loss_accumulated = torch.tensor(0.0)
                 for idx, batch in enumerate(loop):
