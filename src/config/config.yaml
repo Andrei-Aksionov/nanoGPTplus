@@ -1,12 +1,14 @@
 data:
   path:
-    raw: data/raw/
-    interim: data/interim/
+    raw: data/raw
+    interim: data/interim
 
 datasets:
   tiny_shakespeare:
     url: https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
     folder: ${data.path.raw}/tiny_shakespeare
+    filename: input.txt
+    file_path: ${datasets.tiny_shakespeare.folder}/${datasets.tiny_shakespeare.filename}
 
 model:
   seed: 42
@@ -17,3 +19,4 @@ model:
     eval_interval: 300
     learning_rate: 1e-2
     eval_iters: 200
+    epochs: 1

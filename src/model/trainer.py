@@ -1,3 +1,5 @@
+import sys
+
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -12,66 +14,69 @@ class Trainer:
         optimizer,
         train_dataloader,
         test_dataloader,
-        loss,
+        loss=None,
+        tqdm_update_interval: int = 100,
     ) -> None:
         super().__init__()
         self.model = model.to(get_device())
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
         self.test_dataloader = test_dataloader
-        assert loss is F.cross_entropy, "So far only cross-entropy is supported"
-        self.loss = loss
+        if loss:
+            assert loss is F.cross_entropy, "So far only cross-entropy is supported"
+            self.loss = loss
+        else:
+            if not hasattr(self.model, "loss"):
+                raise ValueError("Loss is not provided and model instance doesn't have such method")
+            else:
+                self.loss = self.model.loss
+        self.tqdm_update_interval = tqdm_update_interval
 
-    def mode_batch_to(self, batch, device: torch.device = None):
+    def move_batch_to(self, batch, device: torch.device = None):
         if not device:
             device = next(self.model.parameters()).device
         return [x.to(device) for x in batch]
 
     def train(self, epochs: int):
 
+        tqdm_config = {
+            "ascii": True,
+            "delay": 0.1,
+        }
+
         for epoch in range(epochs):
 
-            print(f" Epoch: {epoch} ".center(40, "="))
+            tqdm.write(f" Epoch: {epoch} ".center(40, "="))
 
-            train_loop = tqdm(self.train_dataloader, ascii=True)
-            self.model.train()
-            batch_loss = torch.tensor(0.0)
-            for idx, batch in enumerate(train_loop):
-                # TODO: maybe not x and y, but inputs and targets?
-                x_train, y_train = self.mode_batch_to(batch)
-                logits = self.model(x_train)
+            train_loop = tqdm(self.train_dataloader, desc="Training", **tqdm_config)
+            eval_loop = tqdm(self.test_dataloader, desc="Evaluating", **tqdm_config)
 
-                B, T, C = logits.shape
-                loss = self.loss(
-                    logits.view(B * T, C),
-                    y_train.view(B * T),
-                )
+            for mode, loop in zip(
+                ["train", "eval"],
+                [train_loop, eval_loop],
+            ):
 
-                batch_loss += loss
-                loss.backward()
-                self.optimizer.step()
-                self.optimizer.zero_grad(set_to_none=True)
+                if mode == "train":
+                    self.model.train()
+                else:
+                    self.model.eval()
 
-                if idx % 100 == 0:
-                    train_loop.set_postfix(train_loss=batch_loss.item() / 100)
-                    batch_loss = 0
+                loss_accumulated = torch.tensor(0.0)
+                for idx, batch in enumerate(loop):
+                    inputs, targets = self.move_batch_to(batch)
 
-            self.model.eval()
-            test_loss = torch.tensor(0.0)
-            test_loop = tqdm(self.test_dataloader, ascii=True)
-            for idx, batch in enumerate(test_loop):
-                x_test, y_test = self.mode_batch_to(batch)
-                logits = self.model(x_test)
-                B, T, C = logits.shape
-                loss = self.loss(
-                    logits.view(B * T, C),
-                    y_test.view(B * T),
-                )
-                test_loss += loss
+                    with torch.set_grad_enabled(mode == "train"):
+                        logits = self.model(inputs)
+                        loss = self.loss(logits, targets)
 
-                if idx % 100 == 0:
-                    test_loop.set_postfix(test_loss=test_loss.item() / 100)
-                    test_loss = 0
+                    if mode == "train":
+                        loss.backward()
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
 
-            train_loop.close()
-            test_loop.close()
+                    with torch.no_grad():
+                        loss_accumulated += loss
+
+                    if idx % self.tqdm_update_interval == 0:
+                        loop.set_postfix(loss=loss_accumulated.item() / 100)
+                        loss_accumulated.zero_()

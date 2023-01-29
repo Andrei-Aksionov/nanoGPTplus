@@ -26,6 +26,6 @@ def download(config: DictConfig) -> Path:
 
     logger.debug("Downloading {} into {}".format(url, dst_folder))
     response = requests.get(url)
-    with open(dst_folder / Path(url).name, "wb") as fout:
+    with open(dst_folder / config.filename, "wb") as fout:
         fout.write(response.content)
     logger.debug("Downloading is finished")
