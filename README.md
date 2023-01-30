@@ -49,11 +49,11 @@ This purpose of it is to better understand how Transformer architecture works by
     python src/data/scripts/download_tiny_shakespeare.py
     ```
 
-    ... or download your favorite dataset, the only thing it has to be a plain text (.txt format). In addition to that change the path to the file in 'src/config/config.yaml' or add sub-section in the 'dataset' section with new dataset name and do not forget change it in the training scripts.
+    ... or download your favorite dataset, the only thing it has to be a plain text (.txt format). In addition to that change the path to the file in `src/config/config.yaml` or add sub-section in the `dataset` section with new dataset name and do not forget change it in the training scripts.
 
 3. Rerun EDA notebook [optional]
 
-    If you work with you custom dataset and it is in plain text format, simply rerun or copy and rerun 'notebooks/EDA/tiny-shakespeare.ipynb' notebook to gain insight into the data.
+    If you work with you custom dataset and it is in plain text format, simply rerun or copy and rerun `notebooks/EDA/tiny-shakespeare.ipynb` notebook to gain insight into the data.
 
 4. Run training via script:
 
@@ -61,7 +61,7 @@ This purpose of it is to better understand how Transformer architecture works by
     python src/model/train.py
     ```
 
-    ... or in the example training notebook: 'notebooks/examples/bigram_model_training.ipynb'.
+    ... or in the example training notebook: `notebooks/examples/bigram_model_training.ipynb`.
 
 ***
 
