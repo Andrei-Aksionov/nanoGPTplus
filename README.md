@@ -5,7 +5,7 @@
 
  ***
 
-In this repository I want to rewrite the code for 'nanoGPT' presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY).
+In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY).
 This purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with few issues as possible).
 
 <p align=center><img src="references/readme/amazon_prime.jpg"></p>
