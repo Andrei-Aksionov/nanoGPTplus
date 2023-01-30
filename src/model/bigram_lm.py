@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import Tensor, nn
 from torch.nn import functional as F
 
 
@@ -22,13 +22,13 @@ class BigramLanguageModel(nn.Module):
         # that why it has square size
         self.token_embedding_table = nn.Embedding(vocab_size, vocab_size)
 
-    def forward(self, idx: torch.Tensor) -> torch.Tensor:  # noqa: D102
+    def forward(self, idx: Tensor) -> Tensor:  # noqa: D102
         # if don't want to deal with custom loss, one can run '.mT' method of the tensor like:
         # > self.token_embedding_table(idx).mT
         # though it's slower
         return self.token_embedding_table(idx)
 
-    def loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    def loss(self, logits: Tensor, targets: Tensor) -> Tensor:
         """Prepare tensors to be compatible with Pytorch's Cross-Entropy loss and applies it.
 
         Cross-Entropy expects to have features as the second-dimension, so we first need to
@@ -37,36 +37,36 @@ class BigramLanguageModel(nn.Module):
 
         Parameters
         ----------
-        logits : torch.Tensor
+        logits : Tensor
             tensor with model's outputs
-        targets : torch.Tensor
+        targets : Tensor
             tensor with true labels
 
         Returns
         -------
-        torch.Tensor
+        Tensor
             tensor with loss value (of how good model's predictions are)
         """
         # contains specific loss to the bigram language model
-        B, T, C = logits.shape
+        b, t, c = logits.shape
         return F.cross_entropy(
-            logits.view(B * T, C),
-            targets.view(B * T),
+            logits.view(b * t, c),
+            targets.view(b * t),
         )
 
-    def generate(self, idx: torch.Tensor, max_new_tokens: int) -> torch.Tensor:
+    def generate(self, idx: Tensor, max_new_tokens: int) -> Tensor:
         """Generate new character after the current one.
 
         Parameters
         ----------
-        idx : torch.Tensor
+        idx : Tensor
             index of the current character
         max_new_tokens : int
             number of characters to be generated
 
         Returns
         -------
-        torch.Tensor
+        Tensor
             tensor containing indices of the provided characters and newly generated
         """
         # idx is (B, T) array of indices in the current context

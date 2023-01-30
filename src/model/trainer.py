@@ -1,6 +1,6 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -46,20 +46,20 @@ class Trainer:
         self.eval_dataloader = eval_dataloader
         # either model should contain the loss or the loss function has to be provided
         if loss:
-            assert loss is F.cross_entropy, "So far only cross-entropy is supported"
+            if loss is not F.cross_entropy:
+                raise ValueError("So far only cross-entropy is supported")
             self.loss = loss
         else:
             if not hasattr(self.model, "loss"):
                 raise ValueError("Loss is not provided and model instance doesn't have such method")
-            else:
-                self.loss = self.model.loss
+            self.loss = self.model.loss
         self.tqdm_update_interval = tqdm_update_interval
 
     def __move_batch_to(
         self,
-        batch: list[torch.Tensor, torch.Tensor],
+        batch: list[Tensor, Tensor],
         device: torch.device = None,
-    ) -> list[torch.Tensor, torch.Tensor]:
+    ) -> list[Tensor, Tensor]:
         if not device:
             device = next(self.model.parameters()).device
         return [x.to(device) for x in batch]

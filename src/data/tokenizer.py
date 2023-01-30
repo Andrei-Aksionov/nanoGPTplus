@@ -13,7 +13,8 @@ class CharTokenizer:
             the whole text on which model will be trained, required to generate vocabulary if not provided,
             by default None
         """
-        assert corpus or vocab, "Either corpus or vocabulary has to be provided"
+        if not (corpus or vocab):
+            raise ValueError("Neither corpus nor vocabulary is provided")
 
         if not vocab:
             self.vocab = set(corpus)

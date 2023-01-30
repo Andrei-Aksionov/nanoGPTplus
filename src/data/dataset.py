@@ -1,5 +1,5 @@
 import numpy as np
-import torch
+from torch import Tensor
 from torch.utils.data import Dataset
 
 
@@ -31,6 +31,6 @@ class Dataset(Dataset):
     def __len__(self) -> int:
         return len(self.data) - self.block_size - 1
 
-    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
         array = self.data[index : index + self.block_size + 1]
         return array[:-1], array[1:]

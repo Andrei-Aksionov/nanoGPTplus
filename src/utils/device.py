@@ -1,7 +1,7 @@
 import torch
 
 
-def get_device(prioritize_gpu: bool = True) -> torch.device:
+def get_device(*, prioritize_gpu: bool = True) -> torch.device:
     """Return what device would be the best for the training.
 
     By default will try to return `gpu` and in case of failure -> rollback to `cpu`.

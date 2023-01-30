@@ -30,7 +30,7 @@ def train() -> None:
     # Step 1: Load the data
     logger.debug("Loading the data...")
     data_path = Path.cwd() / config.datasets.tiny_shakespeare.file_path
-    with open(data_path, "r") as fin:
+    with data_path.open() as fin:
         text = fin.read()
     logger.debug("Data is loaded.")
 

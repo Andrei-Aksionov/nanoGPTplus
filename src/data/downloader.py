@@ -5,7 +5,7 @@ from loguru import logger
 from omegaconf import DictConfig
 
 
-def download(config: DictConfig, override_if_exists: bool = True) -> Path:
+def download(config: DictConfig, *, override_if_exists: bool = True) -> Path:
     """Download file into specified folder.
 
     Parameters
@@ -32,7 +32,8 @@ def download(config: DictConfig, override_if_exists: bool = True) -> Path:
         logger.debug("File already exists and specified to not override: not downloading")
         return file_path
 
-    response = requests.get(url)
-    with open(file_path, "wb") as fout:
+    response = requests.get(url, timeout=30)
+    with file_path.open("wb") as fout:
         fout.write(response.content)
     logger.debug("Downloading is finished")
+    return file_path
