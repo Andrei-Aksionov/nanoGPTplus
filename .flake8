@@ -8,10 +8,10 @@ ignore =
     D100,   # Missing docstring in public module
     D101,   # Missing docstring in public class
     D105,   # Missing docstring in magic method
-    D401,   # First line should be in imperative mood; try rephrasing
+    E203,   # whitespace before ':'
     PT023,  # use @pytest.mark.asyncio() over @pytest.mark.asyncio
     SC200,  # Spelling error in name (e.g. variable, function, class)
-    W292,   # no newline at end of file   PT023,  # use @pytest.mark.asyncio() over @pytest.mark.asyncioflake8(PT023)
+    W292,   # no newline at end of file
 per-file-ignores =
     # D104 - missing docstring in public method
     # F401 - imported but unused

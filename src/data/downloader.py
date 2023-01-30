@@ -25,12 +25,13 @@ def download(config: DictConfig, override_if_exists: bool = True) -> Path:
     url = config.url
     dst_folder = Path.cwd() / config.folder
     dst_folder.mkdir(parents=True, exist_ok=True)
-
-    logger.debug("Downloading {} into {}".format(url, dst_folder))
     file_path = dst_folder / config.filename
+    logger.debug("Downloading {} into {}".format(url, dst_folder))
+
     if file_path.exists() and not override_if_exists:
         logger.debug("File already exists and specified to not override: not downloading")
         return file_path
+
     response = requests.get(url)
     with open(file_path, "wb") as fout:
         fout.write(response.content)

@@ -7,14 +7,21 @@ from torch.utils.data import DataLoader
 from src import config
 from src.data.dataset import Dataset
 from src.data.tokenizer import CharTokenizer
-from src.model.bigram import BigramLanguageModel
+from src.model.bigram_lm import BigramLanguageModel
 from src.model.trainer import Trainer
 from src.utils.data import train_test_split
 from src.utils.seed import set_seed
 
 
-def train():
+def train() -> None:
+    """Train bigram language model.
 
+    Performs 4 steps:
+    1. Loads the data
+    2. Create tokenizer
+    3. Create dataloader
+    4. Train the model
+    """
     # set seed for reproducibility
     set_seed(config.model.seed)
     # assign model's config to a variable
@@ -29,7 +36,7 @@ def train():
 
     # Step 2: Prepare tokenizer and tokenize the data
     logger.debug("Starting tokenizing...")
-    tokenizer = CharTokenizer(text)
+    tokenizer = CharTokenizer(corpus=text)
     data = torch.tensor(tokenizer.encode(text))
     logger.debug("Tokenizing is done.")
 
