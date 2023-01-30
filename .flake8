@@ -1,0 +1,20 @@
+[flake8]
+max-line-length = 120
+ignore =
+    ANN002, # Missing type annotation for *_
+    ANN003, # Missing type annotation for **kwargs
+    ANN101, # Missing type annotation for self in method
+    ANN204, # Missing return type annotation for special method
+    D100,   # Missing docstring in public module
+    D101,   # Missing docstring in public class
+    D105,   # Missing docstring in magic method
+    E203,   # whitespace before ':'
+    PT023,  # use @pytest.mark.asyncio() over @pytest.mark.asyncio
+    SC200,  # Spelling error in name (e.g. variable, function, class)
+    W292,   # no newline at end of file
+per-file-ignores =
+    # D104 - missing docstring in public method
+    # F401 - imported but unused
+    __init__.py: F401, D104
+    # D102 - Missing docstring in public method
+    *_test.py: D102
