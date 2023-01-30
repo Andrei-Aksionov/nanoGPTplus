@@ -25,19 +25,43 @@ tqdm = "~4.64.1"
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "*", extras = ["jupyter"]}
-flake8 = "*"
-flake8-absolute-import = "*"
-flake8-annotations = "*"
-flake8-bugbear = "*"
-flake8-commas = "*"
-flake8-comprehensions = "*"
-flake8-docstrings = "*"
-flake8-eradicate = "*"
-flake8-expression-complexity = "*"
-flake8-isort = "*"
-flake8-print = "*"
-flake8-pytest-style = "*"
 ipywidgets = "~8.0.4"
+ruff = "^0.0.237"
+
+[tool.ruff]
+ignore = [
+  "ANN002", # Missing type annotation for *_
+  "ANN003", # Missing type annotation for **kwargs
+  "ANN101", # Missing type annotation for self in method
+  "B905", # zip() without an explicit strict= parameter
+  "D100", # Missing docstring in public module
+  "D101", # Missing docstring in public class
+  "D105", # Missing docstring in magic method
+  "EM", # flake8-errmsg
+  "G", # flake8-logging-format
+  "INP001", # File {filename} is part of an implicit namespace package. Add an __init__.py
+  "N812", # Lowercase {name} imported as non-lowercase {asname}
+  "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
+  "PT023", # use @pytest.mark.asyncio() over @pytest.mark.asyncio
+  "TCH", # flake8-type-checking
+  "TRY003", # Avoid specifying long messages outside the exception class
+  "UP032", # Use f-string instead of `format`
+]
+line-length = 120
+select = [
+  "ALL",
+]
+target-version = "py310"
+
+[tool.ruff.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.per-file-ignores]
+"*_test.py" = ["D102"]
+"__init__.py" = [
+  "F401",
+  "D104",
+]
 
 [tool.isort]
 profile = "black"
