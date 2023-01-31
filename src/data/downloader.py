@@ -1,8 +1,11 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import requests
 from loguru import logger
-from omegaconf import DictConfig
+
+if TYPE_CHECKING:
+    from omegaconf import DictConfig
 
 
 def download(config: DictConfig, *, override_if_exists: bool = True) -> Path:

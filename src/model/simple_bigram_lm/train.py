@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from src import config
 from src.data.dataset import Dataset
 from src.data.tokenizer import CharTokenizer
-from src.model.bigram_lm import BigramLanguageModel
+from src.model.simple_bigram_lm.bigram_lm import BigramLanguageModel
 from src.model.trainer import Trainer
 from src.utils.data import train_test_split
 from src.utils.seed import set_seed
@@ -25,7 +25,7 @@ def train() -> None:
     # set seed for reproducibility
     set_seed(config.model.seed)
     # assign model's config to a variable
-    model_config = config.model.small
+    model_config = config.model.bigram
 
     # Step 1: Load the data
     logger.debug("Loading the data...")
