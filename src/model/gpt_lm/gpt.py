@@ -2,11 +2,62 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from src.model.gpt_lm.attention import MultiHeadAttention
 from src.utils.device import get_device
 
 
+class FeedForward(nn.Module):
+    def __init__(self, n_embed: int, scaling: int, dropout: float) -> None:
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_embed, scaling * n_embed),
+            nn.ReLU(),
+            nn.Linear(scaling * n_embed, n_embed),
+            nn.Dropout(p=dropout),
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.net(x)
+
+
+class Block(nn.Module):
+    def __init__(self, n_embed, block_size, dropout, num_heads) -> None:
+        super().__init__()
+        head_size = n_embed // num_heads
+        self.self_attention = MultiHeadAttention(
+            block_size=block_size,
+            dropout=dropout,
+            head_size=head_size,
+            n_embed=n_embed,
+            num_heads=num_heads,
+        )
+        # TODO: make sure that `head_size` is 4
+        # it shows that `head_size` is 32
+        # print(f"{head_size=}")
+        # self.feed_forward = FeedForward(n_embed, head_size, dropout)
+        self.feed_forward = FeedForward(n_embed=n_embed, scaling=4, dropout=dropout)
+        self.layer_norm_1 = nn.LayerNorm(n_embed)
+        self.layer_norm_2 = nn.LayerNorm(n_embed)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # TODO: check why in-place doesn't work during backpropagation
+        # x += self.self_attention(self.layer_norm_1(x))
+        # x += self.feed_forward(self.layer_norm_2(x))
+        x = x + self.self_attention(self.layer_norm_1(x))
+        x = x + self.feed_forward(self.layer_norm_2(x))
+        return x
+
+
 class GPT(nn.Module):
-    def __init__(self, vocab_size: int, n_embed: int, n_layers: int, block_size: int) -> None:
+    def __init__(
+        self,
+        vocab_size: int,
+        n_embed: int,
+        n_layers: int,
+        block_size: int,
+        dropout: float,
+        num_heads: int,
+    ) -> None:
         super().__init__()
         self.vocab_size = vocab_size
         self.n_embed = n_embed
@@ -16,12 +67,26 @@ class GPT(nn.Module):
 
         self.token_embedding_table = nn.Embedding(num_embeddings=self.vocab_size, embedding_dim=self.n_embed)
         self.positional_embedding_table = nn.Embedding(num_embeddings=self.block_size, embedding_dim=self.n_embed)
+        self.blocks = nn.Sequential(
+            *[
+                Block(n_embed=n_embed, block_size=block_size, dropout=dropout, num_heads=num_heads)
+                for _ in range(self.n_layer)
+            ]
+        )
+        # TODO: why `normalized_shape` is equal to `n_embed`
+        self.layer_norm = nn.LayerNorm(n_embed)  # final layer norm
+        self.language_model_head = nn.Linear(n_embed, vocab_size)
 
     def forward(self, idx: Tensor) -> Tensor:
         b, t = idx.shape
-        token_embeddings = self.token_embedding_table(idx)
-        positional_embeddings = self.positional_embedding_table(torch.arange(t, device=self.device))
-        return token_embeddings + positional_embeddings
+        token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
+        positional_embeddings = self.positional_embedding_table(torch.arange(t, device=self.device))  # (T, C)
+        x = token_embeddings + positional_embeddings  # (B, T, C)
+        x = self.blocks(x)  # (B, T, C)
+        x = self.layer_norm(x)  # (B, T, C)
+        logits = self.language_model_head(x)  # (B, T, vocab_size)
+
+        return logits
 
     def loss(self, logits: Tensor, targets: Tensor) -> Tensor:
         """Prepare tensors to be compatible with Pytorch's Cross-Entropy loss and applies it.
@@ -66,8 +131,10 @@ class GPT(nn.Module):
         """
         # idx is (B, T) array of indices in the current context
         for _ in range(max_new_tokens):
+            # crop idx to the last block_size items
+            context = idx[:, -self.block_size :]
             # get the predictions
-            logits = self(idx)  # (B, T, C)
+            logits = self(context)  # (B, T, C)
             # focus only on the last time step
             logits = logits[:, -1, :]  # becomes (B, C)
             # apply softmax on the predictions to get probabilities

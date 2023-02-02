@@ -33,6 +33,6 @@ model:
       dropout: 0.2
       epochs: 1
       learning_rate: 3e-4
-      n_embed: 65
+      n_embed: 64
       n_heads: 2
       n_layers: 2

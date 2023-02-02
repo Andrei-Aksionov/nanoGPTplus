@@ -22,7 +22,7 @@ class Head(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: Tensor) -> Tensor:
-        b, t, c = x
+        b, t, c = x.shape
 
         k: Tensor = self.key(x)  # (B, T, C)
         q: Tensor = self.query(x)  # (B, T, C)
@@ -53,12 +53,12 @@ class MultiHeadAttention(nn.Module):
         self.heads = nn.ModuleList(
             [
                 Head(
+                    n_embed=self.n_embed,
                     head_size=self.head_size,
                     block_size=self.block_size,
-                    dropout=self.dropout,
-                    n_embed=self.n_embed,
+                    dropout=dropout,
                 )
-                for _ in self.num_heads
+                for _ in range(self.num_heads)
             ]
         )
 

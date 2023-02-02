@@ -59,6 +59,8 @@ def train() -> None:
         n_embed=model_config.n_embed,
         n_layers=model_config.n_layers,
         block_size=model_config.block_size,
+        dropout=model_config.dropout,
+        num_heads=model_config.n_heads,
     )
     optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
     trainer = Trainer(model, optimizer, train_dataloader, test_dataloader)
