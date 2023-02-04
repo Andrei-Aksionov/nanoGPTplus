@@ -37,7 +37,9 @@ class Trainer:
         Raises
         ------
         ValueError
-            _description_
+            if loss-function is provided and it's not cross-entropy from torch.nn.functional
+        ValueError
+            if loss-function is not provided and the model instance doesn't contain such method
         """
         super().__init__()
         self.model = model.to(get_device())

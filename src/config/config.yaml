@@ -18,21 +18,22 @@ model:
     epochs: 1
     learning_rate: 1e-2
   gpt:
-    batch_size: 64
-    block_size: 256 # what is the maximum context length of predictions
-    dropout: 0.2
-    epochs: 1
-    learning_rate: 3e-4
-    n_embed: 384
-    n_heads: 6
-    n_layers: 6
-
-    debug:
-      batch_size: 32
-      block_size: 8 # what is the maximum context length of predictions
-      dropout: 0.2
-      epochs: 1
-      learning_rate: 3e-4
-      n_embed: 64
-      n_heads: 2
-      n_layers: 2
+    config:
+      full:
+        batch_size: 64
+        block_size: 256 # what is the maximum context length of predictions
+        dropout: 0.2
+        epochs: 1
+        learning_rate: 3e-4
+        n_embed: 384
+        n_heads: 6
+        n_layers: 6
+      debug:
+        batch_size: 32
+        block_size: 8 # what is the maximum context length of predictions
+        dropout: 0.2
+        epochs: 1
+        learning_rate: 3e-4
+        n_embed: 64
+        n_heads: 2
+        n_layers: 2

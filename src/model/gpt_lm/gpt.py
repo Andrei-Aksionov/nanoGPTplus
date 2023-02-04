@@ -7,6 +7,22 @@ from src.utils.device import get_device
 
 
 class FeedForward(nn.Module):
+    """
+    Applied on per-token level. Each token is processed independently.
+
+    # TODO: find info from the deep dive book
+    As I understand after self-attention each token has attention map (?) and now
+    with help of simple fully connected layers this data is processed
+
+    The question: what is exactly is stored in vectors for each token after self-attention
+    Attention scores are multiplied on value matrix and the result is what?
+
+    In the video Andrej noted that attention step is for communication, and feed-forward
+    is for computation.
+
+
+    """
+
     def __init__(self, n_embed: int, scaling: int, dropout: float) -> None:
         super().__init__()
         self.net = nn.Sequential(
@@ -43,6 +59,9 @@ class Block(nn.Module):
         # TODO: check why in-place doesn't work during backpropagation
         # x += self.self_attention(self.layer_norm_1(x))
         # x += self.feed_forward(self.layer_norm_2(x))
+
+        # + sign is used for residual connection
+        # helps with gradient flow and allows to build deeper neural nets
         x = x + self.self_attention(self.layer_norm_1(x))
         x = x + self.feed_forward(self.layer_norm_2(x))
         return x
@@ -66,20 +85,26 @@ class GPT(nn.Module):
         self.device = get_device()
 
         self.token_embedding_table = nn.Embedding(num_embeddings=self.vocab_size, embedding_dim=self.n_embed)
+        # since attention doesn't have any notion of space and we want to use spatial information we need to implement
+        # positional embeddings (they will encode relative position of each token)
+        # positional embeddings knows how to encode position of last N (block_size) tokens
         self.positional_embedding_table = nn.Embedding(num_embeddings=self.block_size, embedding_dim=self.n_embed)
         self.blocks = nn.Sequential(
             *[
                 Block(n_embed=n_embed, block_size=block_size, dropout=dropout, num_heads=num_heads)
                 for _ in range(self.n_layer)
-            ]
+            ],
         )
         # TODO: why `normalized_shape` is equal to `n_embed`
+        # LayerNorm - normalizes features for each sample independently
         self.layer_norm = nn.LayerNorm(n_embed)  # final layer norm
         self.language_model_head = nn.Linear(n_embed, vocab_size)
 
     def forward(self, idx: Tensor) -> Tensor:
         b, t = idx.shape
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
+        # TODO: do we need to create range of length t each time in feed forward method,
+        # since t (number of time steps) is predefined?
         positional_embeddings = self.positional_embedding_table(torch.arange(t, device=self.device))  # (T, C)
         x = token_embeddings + positional_embeddings  # (B, T, C)
         x = self.blocks(x)  # (B, T, C)
@@ -114,6 +139,7 @@ class GPT(nn.Module):
             targets.view(b * t),
         )
 
+    @torch.no_grad()
     def generate(self, idx: Tensor, max_new_tokens: int) -> Tensor:
         """Generate new character after the current one.
 

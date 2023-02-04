@@ -26,7 +26,7 @@ def train() -> None:
     set_seed(config.model.seed)
     # TODO: don't forget to remove
     # model_config = config.model.gpt
-    model_config = config.model.gpt.debug
+    model_config = config.model.gpt.config.debug
 
     # Step 1: Load the data
     logger.debug("Loading the data...")

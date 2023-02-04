@@ -1,5 +1,5 @@
 class CharTokenizer:
-    def __init__(self, vocab: list[str] = None, corpus: str = None) -> None:
+    def __init__(self, vocab: list[str] | None = None, corpus: str | None = None) -> None:
         """Create tokenizer.
 
         If vocab is not provided it will generate vocab from the corpus.
@@ -12,6 +12,11 @@ class CharTokenizer:
         corpus : str, optional
             the whole text on which model will be trained, required to generate vocabulary if not provided,
             by default None
+
+        Raises
+        ------
+        ValueError
+            raises error if neither corpus nor vocabulary was provided
         """
         if not (corpus or vocab):
             raise ValueError("Neither corpus nor vocabulary is provided")

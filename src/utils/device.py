@@ -6,6 +6,11 @@ def get_device(*, prioritize_gpu: bool = True) -> torch.device:
 
     By default will try to return `gpu` and in case of failure -> rollback to `cpu`.
 
+    Parameters
+    ----------
+    prioritize_gpu : bool, optional
+        should try use gpu first, by default True
+
     Returns
     -------
     torch.device

@@ -4,13 +4,16 @@ from torch import Tensor, nn
 
 
 class Head(nn.Module):
-    def __init__(self, n_embed: int, head_size: int, block_size: int, dropout: float) -> None:
+    def __init__(self, n_embed: int, head_size: int, block_size: int, dropout: float, is_decoder: bool = True) -> None:
         super().__init__()
 
         self.n_embed = n_embed
         self.head_size = head_size
         self.block_size = block_size
+        self.is_decoder = is_decoder
 
+        # what don't need `bias` because we simply want to do matrix multiplications
+        # TODO: recall what is n_embed and head_size exactly
         self.key = nn.Linear(in_features=n_embed, out_features=head_size, bias=False)
         self.query = nn.Linear(in_features=n_embed, out_features=head_size, bias=False)
         self.value = nn.Linear(in_features=n_embed, out_features=head_size, bias=False)
@@ -22,17 +25,69 @@ class Head(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: Tensor) -> Tensor:
+        """
+        Self-attention does these things:
+
+        1. takes information from the token x
+        2. encodes it into vectors key, query and value, where:
+            a. key - information of what I have
+            b. query - what I am looking for
+            c. value - if you find me interesting that's what I represent
+        3. creates triangular matrix that will help to mask tokens from the future, in other words
+        token at position 4 should not communicate with token at position 5 and above, only with the previous tokens
+        (3 and below)
+        4. mask token from the future with -inf value, which after softmax operation becomes 0
+        5. does weighted sum by multiplying obtained scores and value matrix
+        """
+
         b, t, c = x.shape
 
+        # key - what do I represent
+        # query - what I am looking for
         k: Tensor = self.key(x)  # (B, T, C)
         q: Tensor = self.query(x)  # (B, T, C)
 
         # compute attention scores ("affinities")
         wei: Tensor = q @ k.transpose(-2, -1)  # (B, T, C) @ (B, C, T) -> (B, T, T)
+        # or
+        # wei = q @ k.mT
+
         # TODO: write down why to do that
+        """
+        In order to preserve 1 unit variance of the product of multiplication of two vectors
+        we need to divide by square root of the features size
+        We need it to make sure that the values after softmax are well spread out, otherwise in worst
+        case scenario the values after the softmax will converge to one-hot encoding (like [0, 0, 1]) and
+        that will mean that the attention will be on a single (or couple of) tokens, and we want it to be
+        spread out (like [0.2, 0.1, 0.7])
+        we want to aggregate information not from a single node
+        """
         wei *= k.shape[-1] ** -0.5
-        wei = wei.masked_fill(self.tril[:t, :t] == 0, float("-inf"))  # (B, T, T)
+
+        # TODO: in the original code wei was scaled by c (number of channels)
+        # now it is scaled by head size
+        # figure out why it was changed
+        if k.shape[-1] != c:
+            msg = f"k of size '{k.shape}' is not equal to c of size '{c}'"
+            raise ValueError(msg)
+
+        # TODO: masking is only needed for decoder part of transformer
+        # I think it's better to move it out of this function in order to make
+        # head be more general
+        # or simple if-statement
+
+        # [0.9, -0.6, 0.3]    [0.9, -inf, -inf]
+        # [0.1, 0.5, -0.1] -> [0.1, 0.5, -inf]
+        # [0.1, 0.2, 0.3]     [0.1, 0.2, 0.3]
+        # and after softmax -inf becomes 0
+        # this doesn't allow current token communicate with future ones
+        if self.is_decoder:
+            wei = wei.masked_fill(self.tril[:t, :t] == 0, float("-inf"))  # (B, T, T)
+
         wei = F.softmax(wei, dim=-1)  # (B, T, T)
+
+        # randomly prevent some nodes from communicating, some of theme randomly are set to zero
+        # helps prevent overfitting
         wei = self.dropout(wei)
 
         # perform the weighted aggregation of the values
@@ -42,10 +97,20 @@ class Head(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
+    """
+    Multi head attention is simply applying multiple attentions in parallel and concatenating results.
+    # TODO: write how different heads might learn different scale, some of them might learn short range attention,
+    # while the others might focus on long range ones.
+
+    It creates multiple independent channels of communication, gather a lot of different data.
+    """
+
     def __init__(self, num_heads: int, head_size: int, n_embed: int, dropout: float, block_size: int) -> None:
         super().__init__()
 
+        # number of heads to be run in parallel
         self.num_heads = num_heads
+        # the size of each head
         self.head_size = head_size
         self.n_embed = n_embed
         self.block_size = block_size
@@ -62,10 +127,12 @@ class MultiHeadAttention(nn.Module):
             ]
         )
 
+        # TODO: why do we need projection in the first place?
         self.projection = nn.Linear(self.n_embed, self.n_embed)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: Tensor) -> Tensor:
+        # concatenate over channel dimension
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.projection(out)
         return self.dropout(out)
