@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from loguru import logger
 from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -14,6 +15,7 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
+        device: torch.device,
         loss: "torch.nn.modules" = None,
         tqdm_update_interval: int = 100,
     ) -> None:
@@ -29,6 +31,8 @@ class Trainer:
             dataloader containing data for training
         eval_dataloader : DataLoader
             dataloader containing data for evaluation
+        device: torch.device
+            where the model and batch should be stored and executed
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
         tqdm_update_interval : int, optional
@@ -42,7 +46,8 @@ class Trainer:
             if loss-function is not provided and the model instance doesn't contain such method
         """
         super().__init__()
-        self.model = model.to(get_device())
+        self.device = device
+        self.model = model.to(self.device)
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
@@ -57,14 +62,8 @@ class Trainer:
             self.loss = self.model.loss
         self.tqdm_update_interval = tqdm_update_interval
 
-    def __move_batch_to(
-        self,
-        batch: list[Tensor, Tensor],
-        device: torch.device = None,
-    ) -> list[Tensor, Tensor]:
-        if not device:
-            device = next(self.model.parameters()).device
-        return [x.to(device) for x in batch]
+    def __move_batch_to(self, batch: list[Tensor, Tensor]) -> list[Tensor, Tensor]:
+        return [x.to(self.device) for x in batch]
 
     def train(self, epochs: int) -> None:
         """Train the model for specified number of epochs.
@@ -74,8 +73,10 @@ class Trainer:
         epochs : int
             the number of epochs the model will be training
         """
-        for epoch in range(epochs):
 
+        logger.debug("Training on '{}' device".format(self.device))
+
+        for epoch in range(epochs):
             tqdm.write(f" Epoch: {epoch} ".center(40, "="))
 
             # reuse code for training and evaluation
@@ -83,7 +84,6 @@ class Trainer:
                 ["train", "eval"],
                 [self.train_dataloader, self.eval_dataloader],
             ):
-
                 if mode == "train":
                     self.model.train()
                 else:

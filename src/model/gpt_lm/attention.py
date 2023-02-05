@@ -4,23 +4,24 @@ from torch import Tensor, nn
 
 
 class Head(nn.Module):
-    def __init__(self, n_embed: int, head_size: int, block_size: int, dropout: float, is_decoder: bool = True) -> None:
+    def __init__(
+        self, embeddings_size: int, head_size: int, context_size: int, dropout: float, *, is_decoder: bool
+    ) -> None:
         super().__init__()
 
-        self.n_embed = n_embed
+        self.embeddings_size = embeddings_size
         self.head_size = head_size
-        self.block_size = block_size
+        self.context_size = context_size
         self.is_decoder = is_decoder
 
         # what don't need `bias` because we simply want to do matrix multiplications
-        # TODO: recall what is n_embed and head_size exactly
-        self.key = nn.Linear(in_features=n_embed, out_features=head_size, bias=False)
-        self.query = nn.Linear(in_features=n_embed, out_features=head_size, bias=False)
-        self.value = nn.Linear(in_features=n_embed, out_features=head_size, bias=False)
+        self.key = nn.Linear(in_features=embeddings_size, out_features=head_size, bias=False)
+        self.query = nn.Linear(in_features=embeddings_size, out_features=head_size, bias=False)
+        self.value = nn.Linear(in_features=embeddings_size, out_features=head_size, bias=False)
         # If you have parameters in your model, which should be saved and restored in the state_dict,
         # but not trained by the optimizer, you should register them as buffers.
         # Buffers won’t be returned in model.parameters(), so that the optimizer won’t have a change to update them.
-        self.register_buffer("tril", torch.tril(torch.ones(self.block_size, self.block_size)))
+        self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
         self.dropout = nn.Dropout(p=dropout)
 
@@ -69,7 +70,7 @@ class Head(nn.Module):
         # figure out why it was changed
         if k.shape[-1] != c:
             msg = f"k of size '{k.shape}' is not equal to c of size '{c}'"
-            raise ValueError(msg)
+            # raise ValueError(msg)
 
         # TODO: masking is only needed for decoder part of transformer
         # I think it's better to move it out of this function in order to make
@@ -105,30 +106,44 @@ class MultiHeadAttention(nn.Module):
     It creates multiple independent channels of communication, gather a lot of different data.
     """
 
-    def __init__(self, num_heads: int, head_size: int, n_embed: int, dropout: float, block_size: int) -> None:
+    def __init__(
+        self,
+        num_heads: int,
+        head_size: int,
+        embeddings_size: int,
+        dropout: float,
+        context_size: int,
+        *,
+        is_decoder: bool,
+    ) -> None:
         super().__init__()
 
         # number of heads to be run in parallel
         self.num_heads = num_heads
         # the size of each head
         self.head_size = head_size
-        self.n_embed = n_embed
-        self.block_size = block_size
+        self.embeddings_size = embeddings_size
+        self.context_size = context_size
 
         self.heads = nn.ModuleList(
             [
                 Head(
-                    n_embed=self.n_embed,
+                    embeddings_size=self.embeddings_size,
                     head_size=self.head_size,
-                    block_size=self.block_size,
+                    context_size=self.context_size,
                     dropout=dropout,
+                    is_decoder=is_decoder,
                 )
                 for _ in range(self.num_heads)
             ]
         )
 
         # TODO: why do we need projection in the first place?
-        self.projection = nn.Linear(self.n_embed, self.n_embed)
+        # We need projection only if the size of dimension is larger than x, because we need to have the
+        # same size for performing residual connection
+        # In my opinion if the size is not changed we might skip it
+        # self.projection = nn.Linear(self.n_embed, self.n_embed)
+        self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x: Tensor) -> Tensor:

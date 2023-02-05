@@ -5,11 +5,12 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from src import config
-from src.data.dataset import Dataset
+from src.data.dataset import NextTokenDataset
 from src.data.tokenizer import CharTokenizer
 from src.model.simple_bigram_lm.bigram_lm import BigramLanguageModel
 from src.model.trainer import Trainer
 from src.utils.data import train_test_split
+from src.utils.device import get_device
 from src.utils.seed import set_seed
 
 
@@ -45,8 +46,8 @@ def train() -> None:
     train_data, test_data = train_test_split(data, 0.9)
     block_size = model_config.block_size
     batch_size = model_config.batch_size
-    train_dataset = Dataset(train_data, block_size)
-    test_dataset = Dataset(test_data, block_size)
+    train_dataset = NextTokenDataset(train_data, block_size)
+    test_dataset = NextTokenDataset(test_data, block_size)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, num_workers=1)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=1)
     logger.debug("Data loaders are prepared.")
@@ -55,7 +56,7 @@ def train() -> None:
     logger.debug("Staring training...")
     model = BigramLanguageModel(vocab_size=tokenizer.vocab_size)
     optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
-    trainer = Trainer(model, optimizer, train_dataloader, test_dataloader)
+    trainer = Trainer(model, optimizer, train_dataloader, test_dataloader, device=get_device())
     trainer.train(epochs=model_config.epochs)
     logger.debug("Training is finished")
 

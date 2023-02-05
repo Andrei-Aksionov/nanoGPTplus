@@ -14,26 +14,28 @@ model:
   seed: 42
   bigram:
     batch_size: 32
-    block_size: 8 # what is the maximum context length of predictions
+    context_size: 8 # what is the maximum context length of predictions
     epochs: 1
     learning_rate: 1e-2
   gpt:
     config:
-      full:
+      large:
         batch_size: 64
-        block_size: 256 # what is the maximum context length of predictions
+        context_size: 256
         dropout: 0.2
+        embeddings_size: 384
         epochs: 1
+        head_size: 32 # either should be provided explicitly or calculated implicitly as embeddings_size / num_heads
         learning_rate: 3e-4
-        n_embed: 384
-        n_heads: 6
-        n_layers: 6
-      debug:
+        num_heads: 6
+        num_layers: 6
+      small:
         batch_size: 32
-        block_size: 8 # what is the maximum context length of predictions
+        context_size: 8
         dropout: 0.2
+        embeddings_size: 64
         epochs: 1
         learning_rate: 3e-4
-        n_embed: 64
-        n_heads: 2
-        n_layers: 2
+        num_heads: 2
+        num_layers: 2
+        head_size: 8

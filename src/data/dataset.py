@@ -1,9 +1,10 @@
 import numpy as np
+import torch
 from torch import Tensor
 from torch.utils.data import Dataset
 
 
-class Dataset(Dataset):
+class NextTokenDataset(Dataset):
     def __init__(self, data: np.ndarray, block_size: int) -> None:
         """Create custom torch Dataset that returns inputs and targets.
 
@@ -32,5 +33,23 @@ class Dataset(Dataset):
         return len(self.data) - self.block_size - 1
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
+        array = self.data[index : index + self.block_size + 1]
+        return array[:-1], array[1:]
+
+
+class NextTokenRandomDataset(Dataset):
+    def __init__(self, data: np.ndarray, block_size: int, max_iter: int) -> None:
+        super().__init__()
+        self.data = data
+        self.block_size = block_size
+        self.max_iter = max_iter
+
+    def __len__(self) -> int:
+        # batch generation will be stop externally
+        return self.max_iter
+
+    def __getitem__(self, _: int) -> tuple[Tensor, Tensor]:
+        # instead of provided index it will randomly generate it
+        index = torch.randint(len(self.data) - self.block_size - 1, (1,))
         array = self.data[index : index + self.block_size + 1]
         return array[:-1], array[1:]
