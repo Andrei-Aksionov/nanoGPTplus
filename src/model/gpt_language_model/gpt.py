@@ -2,76 +2,10 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from src.model.gpt_lm.attention import MultiHeadAttention
+from src import config
+from src.model.gpt_language_model.transformer_block import TransformerBlock
+from src.utils.arguments import grab_arguments
 from src.utils.device import get_device
-
-
-class FeedForward(nn.Module):
-    """
-    Applied on per-token level. Each token is processed independently.
-
-    # TODO: find info from the deep dive book
-    As I understand after self-attention each token has attention map (?) and now
-    with help of simple fully connected layers this data is processed
-
-    The question: what is exactly is stored in vectors for each token after self-attention
-    Attention scores are multiplied on value matrix and the result is what?
-
-    In the video Andrej noted that attention step is for communication, and feed-forward
-    is for computation.
-
-    Consider encoder part of transformer.  If there is no feed-forward layer, self-attention is simply performing
-    re-averaging of value vectors.  In order to add more model function, i.e. element-wise non-linearity transformation
-    of incoming vectors, to transformer, we add feed-forward layer to encoder part of transformer.
-
-    """
-
-    def __init__(self, embeddings_size: int, scaling: int, dropout: float) -> None:
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(embeddings_size, scaling * embeddings_size),
-            nn.ReLU(),
-            nn.Linear(scaling * embeddings_size, embeddings_size),
-            nn.Dropout(p=dropout),
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self.net(x)
-
-
-class Block(nn.Module):
-    def __init__(self, embeddings_size, context_size, dropout, num_heads, is_decoder, head_size=None) -> None:
-        super().__init__()
-        if not head_size:
-            # TODO: write proper exception
-            assert embeddings_size % num_heads == 0, "Cannot do integer division"
-            head_size = embeddings_size // num_heads
-        self.self_attention = MultiHeadAttention(
-            context_size=context_size,
-            dropout=dropout,
-            head_size=head_size,
-            embeddings_size=embeddings_size,
-            num_heads=num_heads,
-            is_decoder=is_decoder,
-        )
-        # TODO: make sure that `head_size` is 4
-        # it shows that `head_size` is 32
-        # print(f"{head_size=}")
-        # self.feed_forward = FeedForward(n_embed, head_size, dropout)
-        self.feed_forward = FeedForward(embeddings_size=embeddings_size, scaling=4, dropout=dropout)
-        self.layer_norm_1 = nn.LayerNorm(embeddings_size)
-        self.layer_norm_2 = nn.LayerNorm(embeddings_size)
-
-    def forward(self, x: Tensor) -> Tensor:
-        # TODO: check why in-place doesn't work during backpropagation
-        # x += self.self_attention(self.layer_norm_1(x))
-        # x += self.feed_forward(self.layer_norm_2(x))
-
-        # + sign is used for residual connection
-        # helps with gradient flow and allows to build deeper neural nets
-        x = x + self.self_attention(self.layer_norm_1(x))
-        x = x + self.feed_forward(self.layer_norm_2(x))
-        return x
 
 
 class GPTLanguageModel(nn.Module):
@@ -100,11 +34,8 @@ class GPTLanguageModel(nn.Module):
         )
         self.blocks = nn.Sequential(
             *[
-                Block(
-                    embeddings_size=embeddings_size,
-                    context_size=context_size,
-                    dropout=dropout,
-                    num_heads=num_heads,
+                TransformerBlock(
+                    **grab_arguments(TransformerBlock, config.model.gpt.size.small),
                     is_decoder=True,
                 )
                 for _ in range(self.num_layers)
@@ -124,9 +55,7 @@ class GPTLanguageModel(nn.Module):
         x = token_embeddings + positional_embeddings  # (B, T, C) (32, 8, 64)
         x = self.blocks(x)  # (B, T, C) (32, 8, 64)
         x = self.layer_norm(x)  # (B, T, C) (32, 8, 64)
-        logits = self.language_model_head(x)  # (B, T, vocab_size) (32, 8, 65)
-
-        return logits
+        return self.language_model_head(x)  # (B, T, vocab_size) (32, 8, 65)
 
     def loss(self, logits: Tensor, targets: Tensor) -> Tensor:
         """Prepare tensors to be compatible with Pytorch's Cross-Entropy loss and applies it.

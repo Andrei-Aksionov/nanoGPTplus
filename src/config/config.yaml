@@ -12,13 +12,14 @@ datasets:
 
 model:
   seed: 42
+  test_split: 0.9
   bigram:
     batch_size: 32
     context_size: 8 # what is the maximum context length of predictions
     epochs: 1
     learning_rate: 1e-2
   gpt:
-    config:
+    size:
       large:
         batch_size: 64
         context_size: 256
