@@ -64,7 +64,7 @@ class SelfAttentionHead(nn.Module):
         5. mask token from the 'future' with -inf value, which after softmax operation becomes 0
         6. does weighted sum by multiplying obtained attention scores and value matrix
         """
-        # batch, timestep, channels
+        # batch, time-step, channels
         b, t, c = x.shape
 
         key = self.key_weights(x)  # (B, T, C)
@@ -106,19 +106,10 @@ class SelfAttentionHead(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    """Multiple Attentions running in parallel.
-
-    Multi head attention is simply applying multiple attentions in parallel and concatenating results.
-    # TODO: write how different heads might learn different scale, some of them might learn short range attention,
-    # while the others might focus on long range ones.
-
-    It creates multiple independent channels of communication, gather a lot of different data.
-    """
-
     def __init__(
         self,
         embeddings_size: int,
-        head_size: int,
+        head_size: int | None,
         num_heads: int,
         context_size: int,
         dropout: float,
@@ -136,8 +127,10 @@ class MultiHeadAttention(nn.Module):
         ----------
         embeddings_size : int
             size of the embeddings - the size of input of self-attention
-        head_size : int
-            the size of output of self-attention
+        head_size : int | None
+            the size of output of self-attention;
+            if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
+            without residual
         num_heads : int
             how many self-attention heads to use
         context_size : int
@@ -147,8 +140,20 @@ class MultiHeadAttention(nn.Module):
             how many connection between tokens are dropped during each forward pass
         is_decoder : bool
             if it's a decoder masking of 'future' tokens will be applied
+
+        Raises
+        ------
+        ValueError
+            if `embeddings_size` cannot be divided by `num_heads` without residual
         """
         super().__init__()
+
+        if not head_size:
+            if embeddings_size % num_heads != 0:
+                msg = "Embeddings size should be divisible by number of heads without residual, "
+                f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
+                raise ValueError(msg)
+            head_size = embeddings_size // num_heads
 
         self.embeddings_size = embeddings_size
         self.head_size = head_size

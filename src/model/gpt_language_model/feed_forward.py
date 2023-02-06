@@ -2,26 +2,26 @@ from torch import Tensor, nn
 
 
 class FeedForward(nn.Module):
-    """
-    Applied on per-token level. Each token is processed independently.
-
-    # TODO: find info from the deep dive book
-    As I understand after self-attention each token has attention map (?) and now
-    with help of simple fully connected layers this data is processed
-
-    The question: what is exactly is stored in vectors for each token after self-attention
-    Attention scores are multiplied on value matrix and the result is what?
-
-    In the video Andrej noted that attention step is for communication, and feed-forward
-    is for computation.
-
-    Consider encoder part of transformer.  If there is no feed-forward layer, self-attention is simply performing
-    re-averaging of value vectors.  In order to add more model function, i.e. element-wise non-linearity transformation
-    of incoming vectors, to transformer, we add feed-forward layer to encoder part of transformer.
-
-    """
-
     def __init__(self, embeddings_size: int, scaling: int, dropout: float) -> None:
+        """Apply on per-token level. Each token is processed independently.
+
+        If the is no feed-forward layer, self-attention is simply a process of re-averaging of value vectors. In order
+        to add element-wise non-linearity transformation of incoming vectors we add feed-forward part.
+
+        You can think about it in this way:
+        - attention step is for communication between tokens
+        - feed-forward is for processing this information (of how tokens are related to each other via attention)
+
+        Parameters
+        ----------
+        embeddings_size : int
+            size of the embeddings - the size of input of self-attention
+        scaling : int
+            feed-forward has two fully-connected layers; the number of neurons between them is larger
+            than input and output sizes, `scaling` specifies by how much
+        dropout : float
+            how many connection between tokens are dropped during each forward pass
+        """
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(embeddings_size, scaling * embeddings_size),
@@ -30,5 +30,5 @@ class FeedForward(nn.Module):
             nn.Dropout(p=dropout),
         )
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Tensor:  # noqa: D102
         return self.net(x)
