@@ -21,22 +21,24 @@ model:
   gpt:
     size:
       large:
-        batch_size: 64
-        context_size: 256
-        dropout: 0.2
         embeddings_size: 384
-        epochs: 1
+        context_size: 256
         head_size: 32 # either should be provided explicitly or calculated implicitly as embeddings_size / num_heads
-        learning_rate: 3e-4
         num_heads: 6
+        feed_forward_scaling: 4
         num_layers: 6
-      small:
-        batch_size: 32
-        context_size: 8
         dropout: 0.2
-        embeddings_size: 64
-        epochs: 1
+        batch_size: 64
         learning_rate: 3e-4
-        num_heads: 2
-        num_layers: 2
+        epochs: 1
+      small:
+        embeddings_size: 64
+        context_size: 8
         head_size: 8
+        num_heads: 2
+        feed_forward_scaling: 4
+        num_layers: 2
+        dropout: 0.2
+        batch_size: 32
+        learning_rate: 3e-4
+        epochs: 1

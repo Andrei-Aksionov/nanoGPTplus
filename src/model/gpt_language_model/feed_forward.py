@@ -23,11 +23,16 @@ class FeedForward(nn.Module):
             how many connection between tokens are dropped during each forward pass
         """
         super().__init__()
+
+        self.embeddings_size = embeddings_size
+        self.scaling = scaling
+        self.dropout = dropout
+
         self.net = nn.Sequential(
-            nn.Linear(embeddings_size, scaling * embeddings_size),
+            nn.Linear(self.embeddings_size, self.scaling * self.embeddings_size),
             nn.ReLU(),
-            nn.Linear(scaling * embeddings_size, embeddings_size),
-            nn.Dropout(p=dropout),
+            nn.Linear(self.scaling * self.embeddings_size, self.embeddings_size),
+            nn.Dropout(self.dropout),
         )
 
     def forward(self, x: Tensor) -> Tensor:  # noqa: D102

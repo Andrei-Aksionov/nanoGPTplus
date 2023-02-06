@@ -7,8 +7,8 @@ class SelfAttentionHead(nn.Module):
     def __init__(
         self,
         embeddings_size: int,
-        head_size: int,
         context_size: int,
+        head_size: int,
         dropout: float,
         *,
         is_decoder: bool,
@@ -19,11 +19,11 @@ class SelfAttentionHead(nn.Module):
         ----------
         embeddings_size : int
             size of the embeddings - the size of input of self-attention
-        head_size : int
-            the size of output of self-attention
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
+        head_size : int
+            the size of output of self-attention
         dropout : float
             how many connection between tokens are dropped during each forward pass
         is_decoder : bool
@@ -32,8 +32,8 @@ class SelfAttentionHead(nn.Module):
         super().__init__()
 
         self.embeddings_size = embeddings_size
-        self.head_size = head_size
         self.context_size = context_size
+        self.head_size = head_size
         self.is_decoder = is_decoder
 
         # what don't need `bias` because we simply want to do matrix multiplications
@@ -65,7 +65,7 @@ class SelfAttentionHead(nn.Module):
         6. does weighted sum by multiplying obtained attention scores and value matrix
         """
         # batch, time-step, channels
-        b, t, c = x.shape
+        B, T, C = x.shape  # noqa: N806
 
         key = self.key_weights(x)  # (B, T, C)
         query = self.query_weights(x)  # (B, T, C)
@@ -91,7 +91,7 @@ class SelfAttentionHead(nn.Module):
             # [0.1, 0.2, 0.3]  -> [0.1, 0.2, 0.3]
             # and after softmax -inf becomes 0
             # this doesn't allow current token communicate with future ones
-            attention_scores = attention_scores.masked_fill(self.tril[:t, :t] == 0, float("-inf"))  # (B, T, T)
+            attention_scores = attention_scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))  # (B, T, T)
 
         # since we want to do weighted averaging we need to transform attention scores into range [0, 1]
         # and sum of all scores should be equal to 1; softmax is a good tool for it
@@ -109,9 +109,9 @@ class MultiHeadAttention(nn.Module):
     def __init__(
         self,
         embeddings_size: int,
+        context_size: int,
         head_size: int | None,
         num_heads: int,
-        context_size: int,
         dropout: float,
         *,
         is_decoder: bool,
@@ -127,15 +127,15 @@ class MultiHeadAttention(nn.Module):
         ----------
         embeddings_size : int
             size of the embeddings - the size of input of self-attention
+        context_size : int
+            the number of tokens that will be used during calculation attention map and
+            weighted averaging of value of each token
         head_size : int | None
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without residual
         num_heads : int
             how many self-attention heads to use
-        context_size : int
-            the number of tokens that will be used during calculation attention map and
-            weighted averaging of value of each token
         dropout : float
             how many connection between tokens are dropped during each forward pass
         is_decoder : bool
@@ -156,19 +156,19 @@ class MultiHeadAttention(nn.Module):
             head_size = embeddings_size // num_heads
 
         self.embeddings_size = embeddings_size
+        self.context_size = context_size
         self.head_size = head_size
         self.num_heads = num_heads
-        self.context_size = context_size
         self.dropout = dropout
         self.is_decoder = is_decoder
 
         self.heads = nn.ModuleList(
             [
                 SelfAttentionHead(
-                    self.embeddings_size,
-                    self.head_size,
-                    self.context_size,
-                    self.dropout,
+                    embeddings_size=self.embeddings_size,
+                    context_size=self.context_size,
+                    head_size=self.head_size,
+                    dropout=self.dropout,
                     is_decoder=self.is_decoder,
                 )
                 for _ in range(self.num_heads)

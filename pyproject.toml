@@ -38,8 +38,6 @@ ignore = [
   "D100", # Missing docstring in public module
   "D101", # Missing docstring in public class
   "D105", # Missing docstring in magic method
-  "D203",
-  "D213",
   "EM", # flake8-errmsg
   "G", # flake8-logging-format
   "INP001", # File {filename} is part of an implicit namespace package. Add an __init__.py
@@ -49,6 +47,7 @@ ignore = [
   "TCH", # flake8-type-checking
   "TRY003", # Avoid specifying long messages outside the exception class
   "UP032", # Use f-string instead of `format`
+  "PLR0913", # Too many arguments to function call
 ]
 line-length = 120
 select = [
