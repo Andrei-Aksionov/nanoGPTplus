@@ -1,15 +1,40 @@
 import inspect
+from collections.abc import Callable
 
 
-def grab_arguments(func, args, ignore_args=None):
-    ignore_args = set(["self"] + (ignore_args or []))
-    expected_args = {arg for arg in inspect.getfullargspec(func).args if not arg in ignore_args}
+def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list = None) -> dict:
+    """Return dictionary only with arguments that the func expects.
 
-    return {k: v for k, v in args.items() if k in expected_args}
+    Parameters
+    ----------
+    func : Callable
+        function that expects some arguments;
+        this helper function will grab only args that are expected
+    args : dict
+        dictionary with keyword arguments
+    ignore_kwargs : list, optional
+        kwargs to ignore, by default None
+
+    Returns
+    -------
+    dict
+        kwargs that are expected by the provided function
+    """
+    ignore_kwargs = set(["self"] + (ignore_kwargs or []))
+    expected_args = {kwarg for kwarg in inspect.getfullargspec(func).args if kwarg not in ignore_kwargs}
+
+    return {k: v for k, v in kwargs.items() if k in expected_args}
 
 
 class ArgumentSaverMixin:
-    def save_arguments(self, ignore: list[str] = None):
+    def save_arguments(self, ignore: list[str] = None) -> None:
+        """Save all provided arguments into __dict__ by setattr.
+
+        Parameters
+        ----------
+        ignore : list[str], optional
+            list of arguments to ignore, by default None
+        """
         ignore = set(["self"] + (ignore or []))
         # get local variables of the frame that called current one
         local_vars = inspect.currentframe().f_back.f_locals

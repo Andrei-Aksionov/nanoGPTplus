@@ -98,7 +98,7 @@ class GPTLanguageModel(nn.Module):
         B, T = idx.shape  # noqa: N806
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        positional_embeddings = self.positional_embedding_table(self.positional_indices)  # (T, C)
+        positional_embeddings = self.positional_embedding_table(self.positional_indices[:T])  # (T, C)
         x = token_embeddings + positional_embeddings  # (B, T, C)
         # apply multiple transformer blocks
         x = self.blocks(x)  # (B, T, C)

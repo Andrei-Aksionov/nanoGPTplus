@@ -5,8 +5,6 @@ from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.utils.device import get_device
-
 
 class Trainer:
     def __init__(
@@ -73,7 +71,6 @@ class Trainer:
         epochs : int
             the number of epochs the model will be training
         """
-
         logger.debug("Training on '{}' device".format(self.device))
 
         for epoch in range(epochs):
@@ -95,7 +92,7 @@ class Trainer:
                 for idx, batch in enumerate(loop):
                     inputs, targets = self.__move_batch_to(batch)
 
-                    # if evaluation there is no need to store any information for backpropagation
+                    # during evaluation there is no need to store any information for backpropagation
                     with torch.set_grad_enabled(mode == "train"):
                         logits = self.model(inputs)
                         loss = self.loss(logits, targets)
@@ -109,7 +106,7 @@ class Trainer:
                     with torch.no_grad():
                         loss_accumulated += loss
 
-                    # update loss value in the tqdm output only `n` batches, so it's not flashing
+                    # update loss value in the tqdm output every `n` batches, so it's not updated too frequently
                     if idx % self.tqdm_update_interval == 0:
                         loop.set_postfix(loss=loss_accumulated.item() / self.tqdm_update_interval)
                         loss_accumulated.zero_()
