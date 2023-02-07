@@ -19,7 +19,7 @@ dataloader:
 model:
   bigram:
     batch_size: 32
-    context_size: 8 # what is the maximum context length of predictions
+    context_size: 8 # what is the maximum number of tokens to use during forward pass
     epochs: 1
     learning_rate: 1e-2
   gpt:
@@ -27,7 +27,7 @@ model:
       large:
         embeddings_size: 384
         context_size: 256
-        head_size: 32 # either should be provided explicitly or calculated implicitly as embeddings_size / num_heads
+        head_size: 32 # either should be provided explicitly or calculated implicitly as embeddings_size // num_heads
         num_heads: 6
         feed_forward_scaling: 4
         num_layers: 6

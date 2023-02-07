@@ -8,8 +8,7 @@ from torch.utils.data import DataLoader
 from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
-from src.utils import get_device, set_seed
-from src.utils.arguments import grab_arguments
+from src.utils import get_device, grab_arguments, set_seed
 
 
 def train(model_class: torch.nn.Module, *, debug: bool) -> None:

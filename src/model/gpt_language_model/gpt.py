@@ -17,7 +17,7 @@ class GPTLanguageModel(nn.Module):
         num_layers: int,
         dropout: float,
     ) -> None:
-        """Create Generative Pre-trained Transformer model (decoder of transformer architecture).
+        """Create Generative Pre-trained Transformer model (decoder part of transformer architecture).
 
         Parameters
         ----------

@@ -63,10 +63,21 @@ class SelfAttentionHead(nn.Module):
         tokens (3 and below)
         5. mask token from the 'future' with -inf value, which after softmax operation becomes 0
         6. does weighted sum by multiplying obtained attention scores and value matrix
+
+        Parameters
+        ----------
+        x : Tensor
+            input tensor containing vector representation of x
+
+        Returns
+        -------
+        Tensor
+            output vector representation of x of size (batch, time-step, head_size)
         """
         # batch, time-step, channels
-        B, T, C = x.shape  # noqa: N806
+        B, T, _ = x.shape  # noqa: N806
 
+        # here and below `C` means `head_size`, not channels of input
         key = self.key_weights(x)  # (B, T, C)
         query = self.query_weights(x)  # (B, T, C)
         value = self.value_weights(x)  # (B, T, C)
@@ -89,7 +100,7 @@ class SelfAttentionHead(nn.Module):
             # [0.9, -0.6, 0.3] -> [0.9, -inf, -inf]
             # [0.1, 0.5, -0.1] -> [0.1, 0.5, -inf]
             # [0.1, 0.2, 0.3]  -> [0.1, 0.2, 0.3]
-            # and after softmax -inf becomes 0
+            # and after softmax `-inf` becomes 0
             # this doesn't allow current token communicate with future ones
             attention_scores = attention_scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))  # (B, T, T)
 
@@ -180,7 +191,19 @@ class MultiHeadAttention(nn.Module):
         self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor) -> Tensor:  # noqa: D102
+    def forward(self, x: Tensor) -> Tensor:
+        """Apply multiple self-attention heads in parallel and concatenate the result.
+
+        Parameters
+        ----------
+        x : Tensor
+            vector representation of input token of size (batch, time-step, channels)
+
+        Returns
+        -------
+        Tensor
+            output vector of the same size as input
+        """
         # concatenate over channel dimension
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.projection(out)

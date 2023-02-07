@@ -13,7 +13,7 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
-        device: torch.device,
+        device: torch.device | None,
         loss: "torch.nn.modules" = None,
         tqdm_update_interval: int = 100,
     ) -> None:
@@ -29,8 +29,9 @@ class Trainer:
             dataloader containing data for training
         eval_dataloader : DataLoader
             dataloader containing data for evaluation
-        device: torch.device
+        device: torch.device | None
             where the model and batch should be stored and executed
+            if device is None, batch will be moved to the same device where the model is
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
         tqdm_update_interval : int, optional
@@ -44,11 +45,15 @@ class Trainer:
             if loss-function is not provided and the model instance doesn't contain such method
         """
         super().__init__()
-        self.device = device
-        self.model = model.to(self.device)
+        self.model = model
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
+        if device:
+            self.device = device
+            self.model.to(self.device)
+        else:
+            self.device = next(model.parameters()).device
         # either model should contain the loss or the loss function has to be provided
         if loss:
             if loss is not F.cross_entropy:

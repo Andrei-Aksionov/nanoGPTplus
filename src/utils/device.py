@@ -1,7 +1,7 @@
 import torch
 
 
-def get_device(*, prioritize_gpu: bool = True) -> torch.device:
+def get_device(*, prioritize_gpu: bool = True) -> str:
     """Return what device would be the best for the training.
 
     By default will try to return `gpu` and in case of failure -> rollback to `cpu`.
@@ -13,7 +13,7 @@ def get_device(*, prioritize_gpu: bool = True) -> torch.device:
 
     Returns
     -------
-    torch.device
+    str
         either `cuda` or `cpu`
     """
     if not prioritize_gpu:

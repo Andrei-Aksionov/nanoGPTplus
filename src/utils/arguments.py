@@ -2,7 +2,7 @@ import inspect
 from collections.abc import Callable
 
 
-def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list = None) -> dict:
+def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list | None = None) -> dict:
     """Return dictionary only with arguments that the func expects.
 
     Parameters
@@ -10,9 +10,9 @@ def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list = None) -> 
     func : Callable
         function that expects some arguments;
         this helper function will grab only args that are expected
-    args : dict
+    kwargs : dict
         dictionary with keyword arguments
-    ignore_kwargs : list, optional
+    ignore_kwargs : list | None, optional
         kwargs to ignore, by default None
 
     Returns
