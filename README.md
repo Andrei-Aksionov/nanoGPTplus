@@ -3,9 +3,10 @@
     <h5 align="center">Knock-off edition<h5>
 </p>
 
- ***
+***
 
 In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY).
+
 This purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with few issues as possible).
 
 <p align=center><img src="references/readme/amazon_prime.jpg"></p>
@@ -19,6 +20,7 @@ This purpose of it is to better understand how Transformer architecture works by
     - *tiny_shakespeare.ipynb*: EDA of the tiny-shakespeare dataset
   - **examples**:
     - *bigram_model_training.ipynb*: example of how this language model can be trained
+    - *gpt_model_training.ipynb*: example of how to train gpt language model
 - **src**
   - **config**
     - *config.yaml*: config file
@@ -29,8 +31,16 @@ This purpose of it is to better understand how Transformer architecture works by
     - *downloader.py*: downloads the data from the web
     - *tokenizer.py*: transform text into integers by corresponding mappings in the vocabulary
   - **model**
-    - *bigram_lm.py*: implementation of simple bigram language model
-    - *train.py*: code to train bigram lm
+    - **bigram_language_mode**
+      - *bigram_lm.py*: implementation of simple bigram language model
+      - **README.md*: notes about architecture of bigram language model
+    - **gpt_language_model**
+      - *attention.py*: single head and multi-head self-attention
+      - *feed_forward.py*: feed-forward layer of transformer block
+      - *gpt.py*: the whole GPT architecture
+      - *README.md*: notes about GPT as a whole and attention in particular
+      - *transformer_block.py*: building block of GPT including self-attention and feed-forward
+    - *train.py*: code to train language model
     - *trainer.py*: code to do all the necessary step for training and evaluating the model
   - **utils**: various utils files
 - *pyproject.toml*: package dependencies are stored here and managed py [Poetry](https://python-poetry.org/)
@@ -57,11 +67,13 @@ This purpose of it is to better understand how Transformer architecture works by
 
 4. Run training via script:
 
+    Note: need to provide model name as argument `--model bigram/gpt` and if it is GPT and want to train quickly small version for debugging purposes provide `--debug` argument:
+
     ```python
-    python src/model/train.py
+    python src/model/train.py --model gpt --debug
     ```
 
-    ... or in the example training notebook: `notebooks/examples/bigram_model_training.ipynb`.
+    ... or in one of the example notebooks in `notebooks/examples/*training.ipynb`.
 
 ***
 

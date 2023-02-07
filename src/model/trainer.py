@@ -1,10 +1,9 @@
 import torch
 import torch.nn.functional as F
+from loguru import logger
 from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-from src.utils.device import get_device
 
 
 class Trainer:
@@ -14,6 +13,7 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
+        device: torch.device | None,
         loss: "torch.nn.modules" = None,
         tqdm_update_interval: int = 100,
     ) -> None:
@@ -29,6 +29,9 @@ class Trainer:
             dataloader containing data for training
         eval_dataloader : DataLoader
             dataloader containing data for evaluation
+        device: torch.device | None
+            where the model and batch should be stored and executed
+            if device is None, batch will be moved to the same device where the model is
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
         tqdm_update_interval : int, optional
@@ -37,13 +40,20 @@ class Trainer:
         Raises
         ------
         ValueError
-            _description_
+            if loss-function is provided and it's not cross-entropy from torch.nn.functional
+        ValueError
+            if loss-function is not provided and the model instance doesn't contain such method
         """
         super().__init__()
-        self.model = model.to(get_device())
+        self.model = model
         self.optimizer = optimizer
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
+        if device:
+            self.device = device
+            self.model.to(self.device)
+        else:
+            self.device = next(model.parameters()).device
         # either model should contain the loss or the loss function has to be provided
         if loss:
             if loss is not F.cross_entropy:
@@ -55,14 +65,8 @@ class Trainer:
             self.loss = self.model.loss
         self.tqdm_update_interval = tqdm_update_interval
 
-    def __move_batch_to(
-        self,
-        batch: list[Tensor, Tensor],
-        device: torch.device = None,
-    ) -> list[Tensor, Tensor]:
-        if not device:
-            device = next(self.model.parameters()).device
-        return [x.to(device) for x in batch]
+    def __move_batch_to(self, batch: list[Tensor, Tensor]) -> list[Tensor, Tensor]:
+        return [x.to(self.device) for x in batch]
 
     def train(self, epochs: int) -> None:
         """Train the model for specified number of epochs.
@@ -72,8 +76,9 @@ class Trainer:
         epochs : int
             the number of epochs the model will be training
         """
-        for epoch in range(epochs):
+        logger.debug("Training on '{}' device".format(self.device))
 
+        for epoch in range(epochs):
             tqdm.write(f" Epoch: {epoch} ".center(40, "="))
 
             # reuse code for training and evaluation
@@ -81,7 +86,6 @@ class Trainer:
                 ["train", "eval"],
                 [self.train_dataloader, self.eval_dataloader],
             ):
-
                 if mode == "train":
                     self.model.train()
                 else:
@@ -93,7 +97,7 @@ class Trainer:
                 for idx, batch in enumerate(loop):
                     inputs, targets = self.__move_batch_to(batch)
 
-                    # if evaluation there is no need to store any information for backpropagation
+                    # during evaluation there is no need to store any information for backpropagation
                     with torch.set_grad_enabled(mode == "train"):
                         logits = self.model(inputs)
                         loss = self.loss(logits, targets)
@@ -107,7 +111,7 @@ class Trainer:
                     with torch.no_grad():
                         loss_accumulated += loss
 
-                    # update loss value in the tqdm output only `n` batches, so it's not flashing
+                    # update loss value in the tqdm output every `n` batches, so it's not updated too frequently
                     if idx % self.tqdm_update_interval == 0:
                         loop.set_postfix(loss=loss_accumulated.item() / self.tqdm_update_interval)
                         loss_accumulated.zero_()

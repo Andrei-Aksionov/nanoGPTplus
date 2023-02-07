@@ -47,7 +47,6 @@ class BigramLanguageModel(nn.Module):
         Tensor
             tensor with loss value (of how good model's predictions are)
         """
-        # contains specific loss to the bigram language model
         b, t, c = logits.shape
         return F.cross_entropy(
             logits.view(b * t, c),

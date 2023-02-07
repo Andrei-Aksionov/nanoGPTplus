@@ -1,3 +1,5 @@
+seed: 42
+
 data:
   path:
     raw: data/raw
@@ -10,13 +12,37 @@ datasets:
     filename: input.txt
     file_path: ${datasets.tiny_shakespeare.folder}/${datasets.tiny_shakespeare.filename}
 
+dataloader:
+  test_split: 0.9
+  num_workers: 4
+
 model:
-  seed: 42
-  small:
+  bigram:
     batch_size: 32
-    block_size: 8 # what is the maximum context length of predictions
+    context_size: 8 # what is the maximum number of tokens to use during forward pass
     epochs: 1
-    eval_interval: 300
-    eval_iters: 200
     learning_rate: 1e-2
-    max_iters: 3_000
+  gpt:
+    size:
+      large:
+        embeddings_size: 384
+        context_size: 256
+        head_size: 32 # either should be provided explicitly or calculated implicitly as embeddings_size // num_heads
+        num_heads: 6
+        feed_forward_scaling: 4
+        num_layers: 6
+        dropout: 0.2
+        batch_size: 64
+        learning_rate: 3e-4
+        epochs: 1
+      small:
+        embeddings_size: 64
+        context_size: 8
+        head_size: 8
+        num_heads: 2
+        feed_forward_scaling: 4
+        num_layers: 2
+        dropout: 0.2
+        batch_size: 32
+        learning_rate: 3e-4
+        epochs: 1

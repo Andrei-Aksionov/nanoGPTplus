@@ -25,6 +25,7 @@ tqdm = "~4.64.1"
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "*", extras = ["jupyter"]}
+darglint = "~1.8.1"
 ipywidgets = "~8.0.4"
 ruff = "*"
 
@@ -41,6 +42,7 @@ ignore = [
   "G", # flake8-logging-format
   "INP001", # File {filename} is part of an implicit namespace package. Add an __init__.py
   "N812", # Lowercase {name} imported as non-lowercase {asname}
+  "PLR0913", # Too many arguments to function call
   "PLR2004", # Magic value used in comparison, consider replacing {value} with a constant variable
   "PT023", # use @pytest.mark.asyncio() over @pytest.mark.asyncio
   "TCH", # flake8-type-checking
@@ -54,7 +56,7 @@ select = [
 target-version = "py310"
 
 [tool.ruff.pydocstyle]
-convention = "numpy"
+convention = "pep257"
 
 [tool.ruff.per-file-ignores]
 # D102 - Missing docstring in public method
