@@ -118,6 +118,10 @@ class GPTLanguageModel(nn.Module):
         """
         # batch, time-step
         B, T = idx.shape  # noqa: N806
+        if self.context_size < T:
+            msg = f"Cannot do forward pass on sequence of length {T}, "
+            f"context size should less or equal to {self.context_size}"
+            raise ValueError(msg)
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
         positional_embeddings = self.positional_embedding_table(self.positional_indices[:T])  # (T, C)
