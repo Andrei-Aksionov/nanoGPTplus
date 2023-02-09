@@ -74,6 +74,27 @@ class GPTLanguageModel(nn.Module):
         self.layer_norm = nn.LayerNorm(self.embeddings_size)  # final layer norm
         self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size)
 
+        self.apply(self.__init_weights)
+
+    def __init_weights(self, module: "torch.nn.modules") -> None:
+        """Initialize Embedding and Linear layers with a smaller std.
+
+        By default weights of Embedding layer are initialized from normal distribution
+        with zero mean and unit std ( N(0, 1) ).
+        Weights for linear layer are initialized from uniform distribution from
+        [-k**0.5, k**0.5], where k = 1 / in_features. Even with 128 features it will be
+        [-0.09, 0.09].
+
+        Parameters
+        ----------
+        module : torch.nn.modules
+            module of the network
+        """
+        if isinstance(module, (nn.Embedding, nn.Linear)):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if hasattr(module, "bias") and module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+
     def forward(self, idx: Tensor) -> Tensor:
         """Do the whole forward pass for decoder part of transformer.
 
