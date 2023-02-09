@@ -7,7 +7,7 @@
 
 In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY).
 
-This purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with few issues as possible).
+The purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with as few issues as possible).
 
 <p align=center><img src="references/readme/amazon_prime.jpg"></p>
 
@@ -79,7 +79,7 @@ This purpose of it is to better understand how Transformer architecture works by
 
 ## Additional: git pre-commit hook
 
-In order to run `black` formatter and `flake8` linter before each commit you need to add them into `.git/hooks` folder either manually or with helper script:
+In order to run `black` formatter before each commit you need to add them into `.git/hooks` folder either manually or with helper script:
 
 ```bash
 sh .add_git_hooks.sh`
