@@ -9,6 +9,20 @@ from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
 from src.utils import get_device, grab_arguments, set_seed
+from src.utils.model import load_checkpoint, pickle_dump, pickle_load
+
+
+def __get_model_config(model_class: torch.nn.Module, config: dict, *, debug: bool) -> dict:
+    model_class_name = model_class.__name__
+    if model_class_name == "BigramLanguageModel":
+        model_config = config.model.bigram
+    elif model_class_name == "GPTLanguageModel":
+        model_config = config.model.gpt.size.small if debug else config.model.gpt.size.large
+    else:
+        msg = f"There is no config for class '{model_class_name}'"
+        logger.critical(msg)
+        raise ValueError(msg)
+    return model_config
 
 
 def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> None:
@@ -39,15 +53,7 @@ def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> N
     set_seed(config.seed)
 
     # assign model's config to a variable
-    model_class_name = model_class.__name__
-    if model_class_name == "BigramLanguageModel":
-        model_config = config.model.bigram
-    elif model_class_name == "GPTLanguageModel":
-        model_config = config.model.gpt.size.small if debug else config.model.gpt.size.large
-    else:
-        msg = f"There is no config for class '{model_class_name}'"
-        logger.critical(msg)
-        raise ValueError(msg)
+    model_config = __get_model_config(model_class, config, debug=debug)
 
     # Step 1: Load the data
     logger.info("Loading the data...")
@@ -61,6 +67,11 @@ def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> N
     tokenizer = CharTokenizer(corpus=text)
     data = torch.tensor(tokenizer.encode(text))
     logger.info("Tokenizing is done.")
+
+    # Step 2.1. Save tokenizer
+    logger.info("Saving tokenizer...")
+    pickle_dump(tokenizer, model_config.tokenizer_path)
+    logger.info("Tokenizer is saved.")
 
     # Step 3: Create data loaders
     logger.info("Preparing data loaders...")
@@ -85,9 +96,31 @@ def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> N
     model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
     optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
     device = device if device else get_device()
-    trainer = Trainer(model, optimizer, train_dataloader, test_dataloader, device=device)
+    trainer = Trainer(
+        model,
+        optimizer,
+        train_dataloader,
+        test_dataloader,
+        device=device,
+        checkpoint_model_path=model_config.checkpoint_model_path,
+    )
     trainer.train(epochs=model_config.epochs)
     logger.info("Training is finished")
+
+
+def generate_new_tokens(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> None:
+    model_config = __get_model_config(model_class, config, debug=debug)
+
+    tokenizer = pickle_load(model_config.tokenizer_path)
+    model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+    load_checkpoint(model_config.checkpoint_model_path, model)
+
+    device = device if device else get_device()
+
+    tokens = tokenizer.encode(" ")
+    context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
+    new_tokens = tokenizer.decode(model.generate(context, max_new_tokens=100).squeeze().tolist())
+    logger.info("New generated tokens: {}".format(new_tokens))
 
 
 def main() -> None:
@@ -116,6 +149,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     train(models[args.model], args.device, debug=args.debug)
+    generate_new_tokens(models[args.model], args.device, debug=args.debug)
 
 
 if __name__ == "__main__":

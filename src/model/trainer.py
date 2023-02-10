@@ -5,6 +5,8 @@ from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.utils.model import save_checkpoint
+
 
 class Trainer:
     def __init__(
@@ -16,6 +18,7 @@ class Trainer:
         device: torch.device | None,
         loss: "torch.nn.modules" = None,
         tqdm_update_interval: int = 100,
+        checkpoint_model_path: str = "models/model.pth.tar",
     ) -> None:
         """Contains boilerplate to train and evaluate the model.
 
@@ -36,6 +39,8 @@ class Trainer:
             function to measure correctness of predictions, if not provided the model should contain it, by default None
         tqdm_update_interval : int, optional
             how often (in batches) loss value should be updated, by default 100
+        checkpoint_model_path : str, optional
+            where to save the best model, by default "models/model.pth.tar"
 
         Raises
         ------
@@ -64,6 +69,7 @@ class Trainer:
                 raise ValueError("Loss is not provided and model instance doesn't have such method")
             self.loss = self.model.loss
         self.tqdm_update_interval = tqdm_update_interval
+        self.checkpoint_model_path = checkpoint_model_path
 
     def __move_batch_to(self, batch: list[Tensor, Tensor]) -> list[Tensor, Tensor]:
         return [x.to(self.device) for x in batch]
@@ -78,6 +84,8 @@ class Trainer:
         """
         logger.debug("Training on '{}' device".format(self.device))
 
+        best_eval_loss = float("inf")
+
         for epoch in range(epochs):
             tqdm.write(f" Epoch: {epoch} ".center(40, "="))
 
@@ -86,14 +94,12 @@ class Trainer:
                 ["train", "eval"],
                 [self.train_dataloader, self.eval_dataloader],
             ):
-                if mode == "train":
-                    self.model.train()
-                else:
-                    self.model.eval()
+                self.model.train() if mode == "train" else self.model.eval()
 
                 loop = tqdm(dataloader, desc=mode, ascii=True)
 
-                loss_accumulated = torch.tensor(0.0, device=self.device)
+                loss_batch = torch.tensor(0.0, device=self.device)
+                eval_loss = torch.tensor(0.0, device=self.device)
                 for idx, batch in enumerate(loop):
                     inputs, targets = self.__move_batch_to(batch)
 
@@ -109,9 +115,22 @@ class Trainer:
                         self.optimizer.zero_grad()
 
                     with torch.no_grad():
-                        loss_accumulated += loss
+                        loss_batch += loss
+                        if mode == "eval":
+                            eval_loss += loss
 
                     # update loss value in the tqdm output every `n` batches, so it's not updated too frequently
-                    if idx % self.tqdm_update_interval == 0:
-                        loop.set_postfix(loss=loss_accumulated.item() / self.tqdm_update_interval)
-                        loss_accumulated.zero_()
+                    if idx and idx % self.tqdm_update_interval == 0:
+                        loop.set_postfix(loss=loss_batch.item() / self.tqdm_update_interval)
+                        loss_batch.zero_()
+
+            eval_loss /= len(self.eval_dataloader)
+            tqdm.write(f"Eval averaged loss: {eval_loss}")
+            if eval_loss < best_eval_loss:
+                logger.info(
+                    "Current eval loss is `{:.4f}` which is smaller than current best loss is `{:.4f}`; "
+                    "saving the model...".format(eval_loss, best_eval_loss),
+                )
+                best_eval_loss = eval_loss
+                save_checkpoint(state=self.model.state_dict(), path=self.checkpoint_model_path)
+                logger.info("Best model is saved.")
