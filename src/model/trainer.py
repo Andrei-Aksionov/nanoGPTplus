@@ -93,7 +93,7 @@ class Trainer:
 
                 loop = tqdm(dataloader, desc=mode, ascii=True)
 
-                loss_accumulated = torch.tensor(0.0)
+                loss_accumulated = torch.tensor(0.0, device=self.device)
                 for idx, batch in enumerate(loop):
                     inputs, targets = self.__move_batch_to(batch)
 

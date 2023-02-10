@@ -8,7 +8,7 @@ readme = "README.md"
 version = "1.0.0"
 
 [tool.poetry.dependencies]
-ipykernel = "~6.20.1"
+ipykernel = "~6.21.1"
 loguru = "~0.6.0"
 matplotlib = "~3.6.3"
 numpy = "~1.24.1"
@@ -16,10 +16,10 @@ omegaconf = "~2.3.0"
 pandas = "~1.5.2"
 python = "~3.10.8"
 requests = "~2.28.1"
-tensorboard = "~2.11.0"
+tensorboard = "~2.12.0"
 torch = [
-  {version = "~1.12.0+cpu", platform = "darwin"},
-  {version = "~1.12.0", platform = "linux"},
+  {version = "~1.13.0+cpu", platform = "darwin"},
+  {version = "~1.13.0", platform = "linux"},
 ]
 tqdm = "~4.64.1"
 

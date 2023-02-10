@@ -14,8 +14,11 @@ def get_device(*, prioritize_gpu: bool = True) -> str:
     Returns
     -------
     str
-        either `cuda` or `cpu`
+        either `cuda`, `mps` or `cpu`
     """
-    if not prioritize_gpu:
-        return "cpu"
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    if prioritize_gpu:
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+    return "cpu"
