@@ -56,7 +56,6 @@ class GPTLanguageModel(nn.Module):
         # positional embeddings (they will encode relative position of each token)
         # positional embeddings knows how to encode position of last N (context_size) tokens
         self.positional_embedding_table = nn.Embedding(self.context_size, self.embeddings_size)
-        self.positional_indices = torch.arange(self.context_size)
         self.embeddings_dropout = nn.Dropout(dropout)
         self.blocks = nn.Sequential(
             *[
@@ -128,7 +127,7 @@ class GPTLanguageModel(nn.Module):
 
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        positional_embeddings = self.positional_embedding_table(self.positional_indices[:T])  # (T, C)
+        positional_embeddings = self.positional_embedding_table.weight[:T]  # (T, C)
         x = token_embeddings + positional_embeddings  # (B, T, C)
         x = self.embeddings_dropout(x)  # (B, T, C)
 
