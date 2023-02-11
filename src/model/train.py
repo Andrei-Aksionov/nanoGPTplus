@@ -79,13 +79,12 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
     logger.info("Staring training...")
     model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
     optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
-    device = device if device else get_device()
     trainer = Trainer(
         model,
         optimizer,
         train_dataloader,
         test_dataloader,
-        device=device,
+        device=device or get_device(),
         checkpoint_model_path=model_config.checkpoint_model_path,
     )
     trainer.train(epochs=model_config.epochs)

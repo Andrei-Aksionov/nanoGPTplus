@@ -17,8 +17,8 @@ class Trainer:
         eval_dataloader: DataLoader,
         device: torch.device | None,
         loss: "torch.nn.modules" = None,
-        tqdm_update_interval: int = 100,
         checkpoint_model_path: str = "models/model.pth.tar",
+        tqdm_update_interval: int = 100,
     ) -> None:
         """Contains boilerplate to train and evaluate the model.
 
@@ -37,10 +37,10 @@ class Trainer:
             if device is None, batch will be moved to the same device where the model is
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
-        tqdm_update_interval : int, optional
-            how often (in batches) loss value should be updated, by default 100
         checkpoint_model_path : str, optional
             where to save the best model, by default "models/model.pth.tar"
+        tqdm_update_interval : int, optional
+            how often (in batches) loss value should be updated, by default 100
 
         Raises
         ------
@@ -61,13 +61,11 @@ class Trainer:
             self.device = next(model.parameters()).device
         # either model should contain the loss or the loss function has to be provided
         if loss:
-            if loss is not F.cross_entropy:
-                raise ValueError("So far only cross-entropy is supported")
             self.loss = loss
-        else:
-            if not hasattr(self.model, "loss"):
-                raise ValueError("Loss is not provided and model instance doesn't have such method")
+        elif hasattr(self.model, "loss"):
             self.loss = self.model.loss
+        else:
+            raise ValueError("Loss is not provided and model instance doesn't have such method")
         self.tqdm_update_interval = tqdm_update_interval
         self.checkpoint_model_path = checkpoint_model_path
 

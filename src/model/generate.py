@@ -26,7 +26,7 @@ def generate_new_tokens(model_class: torch.nn.Module, device: str | None, size: 
         how many tokens to generate
     """
     # get device and model's config
-    device = device if device else get_device()
+    device = device or get_device()
     model_config = get_model_config(model_class, config, size)
 
     # load tokenizer and pre-trained models
