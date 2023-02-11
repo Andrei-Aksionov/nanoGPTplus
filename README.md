@@ -69,11 +69,12 @@ The purpose of it is to better understand how Transformer architecture works by 
 4. Run training via script:
 
     Train script accepts multiple arguments:
-    1. Model name: `--model [bigram, gpt]` .
-    2. Model size: `--size [small, large]` (small is good for debugging alongside with dataset fraction).
-    3. Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically trying to use GPU first and if it's not available - fallback to cpu.
-    4. Dataset fraction: `--dataset-fraction` **[Optional]**: usuful if one wants to quickly run training for debugging (affects both training and testing datasets). If not provided the whole dataset will be used.
-    Arguments 1 and 2 are required.
+    - Model name: `--model [bigram, gpt]` .
+    - Model size: `--size [small, large]` (small is good for debugging alongside with dataset fraction).
+    - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
+    - Dataset fraction: `--dataset-fraction` **[Optional]**: useful if one wants to quickly run training for debugging (affects both training and testing datasets). If not provided the whole dataset will be used.
+
+    **Arguments 1 and 2 are required.**
 
     ```python
     python src/model/train.py --model gpt --size large
@@ -84,10 +85,10 @@ The purpose of it is to better understand how Transformer architecture works by 
 5. Run new token generation:
 
     Generation script accepts multiple arguments:
-    1. Model name: `--model [bigram, gpt]` .
-    2. Model size: `--size [small, large]` (small is good for debugging).
-    3. Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically trying to use GPU first and if it's not available - fallback to cpu.
-    4. Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
+    - Model name: `--model [bigram, gpt]` .
+    - Model size: `--size [small, large]` (small is good for debugging).
+    - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
+    - Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
 
     ```python
     python src/model/generate.py --model gpt --size large --max-new-tokens 100
