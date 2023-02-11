@@ -30,3 +30,9 @@ repos:
   rev: v0.12.1
   hooks:
   - id: validate-pyproject
+
+  # ruff
+- repo: https://github.com/charliermarsh/ruff-pre-commit
+  rev: 'v0.0.245'
+  hooks:
+  - id: ruff
