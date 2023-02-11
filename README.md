@@ -40,6 +40,7 @@ The purpose of it is to better understand how Transformer architecture works by 
       - *gpt.py*: the whole GPT architecture
       - *README.md*: notes about GPT as a whole and attention in particular
       - *transformer_block.py*: building block of GPT including self-attention and feed-forward
+    - *generate.py*: code for generating new tokens with help of pre-trained model
     - *train.py*: code to train language model
     - *trainer.py*: code to do all the necessary step for training and evaluating the model
   - **utils**: various utils files
