@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor, nn
 from torch.utils.data import DataLoader
