@@ -83,54 +83,49 @@ class Trainer:
             the number of epochs the model will be training
         """
         logger.debug("Training on '{}' device".format(self.device))
-
         best_eval_loss = float("inf")
 
         for epoch in range(epochs):
             tqdm.write(f" Epoch: {epoch} ".center(40, "="))
-
             # reuse code for training and evaluation
+
             for mode, dataloader in zip(
                 ["train", "eval"],
                 [self.train_dataloader, self.eval_dataloader],
             ):
+                # set model into train or eval mode: required for BatchNorm or Dropout
                 self.model.train() if mode == "train" else self.model.eval()
 
                 loop = tqdm(dataloader, desc=mode, ascii=True)
-
-                loss_batch = torch.tensor(0.0, device=self.device)
-                eval_loss = torch.tensor(0.0, device=self.device)
-                for idx, batch in enumerate(loop):
+                epoch_loss = torch.tensor(0.0, device=self.device)  # to store accumulated loss during epoch
+                for idx, batch in enumerate(loop, start=1):
+                    # data should be on the same device as the model
                     inputs, targets = self.__move_batch_to(batch)
-
                     # during evaluation there is no need to store any information for backpropagation
                     with torch.set_grad_enabled(mode == "train"):
                         logits = self.model(inputs)
                         loss = self.loss(logits, targets)
-
                     # if training -> do the gradient descent
                     if mode == "train":
                         loss.backward()
                         self.optimizer.step()
                         self.optimizer.zero_grad()
-
+                    # do not add `epoch_loss` into the computational graph
                     with torch.no_grad():
-                        loss_batch += loss
-                        if mode == "eval":
-                            eval_loss += loss
-
+                        epoch_loss += loss
                     # update loss value in the tqdm output every `n` batches, so it's not updated too frequently
-                    if idx and idx % self.tqdm_update_interval == 0:
-                        loop.set_postfix(loss=loss_batch.item() / self.tqdm_update_interval)
-                        loss_batch.zero_()
+                    if idx % self.tqdm_update_interval == 0:
+                        loop.set_postfix(loss=epoch_loss.item() / idx)
 
-            eval_loss /= len(self.eval_dataloader)
-            tqdm.write(f"Eval averaged loss: {eval_loss}")
-            if eval_loss < best_eval_loss:
-                logger.info(
-                    "Current eval loss is `{:.4f}` which is smaller than current best loss is `{:.4f}`; "
-                    "saving the model...".format(eval_loss, best_eval_loss),
-                )
-                best_eval_loss = eval_loss
-                save_checkpoint(state=self.model.state_dict(), path=self.checkpoint_model_path)
-                logger.info("Best model is saved.")
+                # save best performing model (epoch with the smallest eval loss)
+                if mode == "eval":
+                    eval_loss = epoch_loss.item() / len(self.eval_dataloader)
+                    tqdm.write(f"Eval averaged loss: {eval_loss:.4f}")
+                    if eval_loss < best_eval_loss:
+                        logger.info(
+                            "Current eval loss is `{:.4f}` which is smaller than current best loss of `{:.4f}`; "
+                            "saving the model...".format(eval_loss, best_eval_loss),
+                        )
+                        best_eval_loss = eval_loss
+                        save_checkpoint(state=self.model.state_dict(), path=self.checkpoint_model_path)
+                        logger.info("Best model is saved.")

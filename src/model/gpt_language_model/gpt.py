@@ -112,6 +112,11 @@ class GPTLanguageModel(nn.Module):
             during inference we don't care about all tokens but the very last one, so we can
             apply final language head only on the last token and save some computations
 
+        Raises
+        ------
+        ValueError
+            if there is a mismatch between number of time-steps and self.context_size
+
         Returns
         -------
         Tensor

@@ -9,23 +9,10 @@ from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
 from src.utils import get_device, grab_arguments, set_seed
-from src.utils.model import load_checkpoint, pickle_dump, pickle_load
+from src.utils.model import get_model_config, pickle_dump
 
 
-def __get_model_config(model_class: torch.nn.Module, config: dict, *, debug: bool) -> dict:
-    model_class_name = model_class.__name__
-    if model_class_name == "BigramLanguageModel":
-        model_config = config.model.bigram
-    elif model_class_name == "GPTLanguageModel":
-        model_config = config.model.gpt.size.small if debug else config.model.gpt.size.large
-    else:
-        msg = f"There is no config for class '{model_class_name}'"
-        logger.critical(msg)
-        raise ValueError(msg)
-    return model_config
-
-
-def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> None:
+def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_fraction: float | None = None) -> None:
     """Train a language model.
 
     Performs 4 steps:
@@ -41,19 +28,16 @@ def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> N
     device: str | None
         on what device to train, if not provided will try to figure out what device to use such as:
         if gpu (cuda or mps) is available will use it, if not - cpu
-    debug : bool
-        GPT model has two configs: small and large. Small is used for debug purpose as it's fast
-
-    Raises
-    ------
-    ValueError
-        if there is no config for provided language model
+    size: str
+        a model has two configs: small and large. Small is used for debug purpose as it's fast
+    dataset_fraction: float | None
+        for debugging purposes one might want to run training only on a small fraction of a dataset
     """
     # set seed for reproducibility
     set_seed(config.seed)
 
     # assign model's config to a variable
-    model_config = __get_model_config(model_class, config, debug=debug)
+    model_config = get_model_config(model_class, config, size)
 
     # Step 1: Load the data
     logger.info("Loading the data...")
@@ -80,12 +64,12 @@ def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> N
     train_data, test_data = data[:test_split], data[test_split:]
     # Step 3.2. Create data loaders
     train_dataloader = DataLoader(
-        NextTokenDataset(train_data, model_config.context_size),
+        NextTokenDataset(train_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
         num_workers=config.dataloader.num_workers,
     )
     test_dataloader = DataLoader(
-        NextTokenDataset(test_data, model_config.context_size),
+        NextTokenDataset(test_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
         num_workers=config.dataloader.num_workers,
     )
@@ -108,21 +92,6 @@ def train(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> N
     logger.info("Training is finished")
 
 
-def generate_new_tokens(model_class: torch.nn.Module, device: str | None, *, debug: bool) -> None:
-    model_config = __get_model_config(model_class, config, debug=debug)
-
-    tokenizer = pickle_load(model_config.tokenizer_path)
-    model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
-    load_checkpoint(model_config.checkpoint_model_path, model)
-
-    device = device if device else get_device()
-
-    tokens = tokenizer.encode(" ")
-    context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
-    new_tokens = tokenizer.decode(model.generate(context, max_new_tokens=100).squeeze().tolist())
-    logger.info("New generated tokens: {}".format(new_tokens))
-
-
 def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
     parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
@@ -136,10 +105,10 @@ def main() -> None:
         type=str,
     )
     parser.add_argument(
-        "--debug",
-        "-d",
-        action="store_true",
-        help="Do you want to run fast training for debug purpose?",
+        "--size",
+        "-s",
+        choices=["small", "large"],
+        help="The size of the model (small or large)",
     )
     parser.add_argument(
         "--device",
@@ -147,9 +116,14 @@ def main() -> None:
         required=False,
         type=str,
     )
+    parser.add_argument(
+        "--dataset-fraction",
+        help="For debugging purpose you can run training only on a fraction of the dataset",
+        required=False,
+        type=float,
+    )
     args = parser.parse_args()
-    train(models[args.model], args.device, debug=args.debug)
-    generate_new_tokens(models[args.model], args.device, debug=args.debug)
+    train(models[args.model], args.device, args.size, args.dataset_fraction)
 
 
 if __name__ == "__main__":
