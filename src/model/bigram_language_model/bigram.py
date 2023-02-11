@@ -47,10 +47,10 @@ class BigramLanguageModel(nn.Module):
         Tensor
             tensor with loss value (of how good model's predictions are)
         """
-        b, t, c = logits.shape
+        B, T, C = logits.shape  # noqa: N806
         return F.cross_entropy(
-            logits.view(b * t, c),
-            targets.view(b * t),
+            logits.view(B * T, C),
+            targets.view(B * T),
         )
 
     def generate(self, idx: Tensor, max_new_tokens: int) -> Tensor:

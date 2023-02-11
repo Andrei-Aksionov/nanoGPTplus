@@ -9,9 +9,10 @@ from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
 from src.utils import get_device, grab_arguments, set_seed
+from src.utils.model import get_model_config, pickle_dump
 
 
-def train(model_class: torch.nn.Module, *, debug: bool) -> None:
+def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_fraction: float | None = None) -> None:
     """Train a language model.
 
     Performs 4 steps:
@@ -24,27 +25,19 @@ def train(model_class: torch.nn.Module, *, debug: bool) -> None:
     ----------
     model_class : torch.nn.Module
         what language model to use
-    debug : bool
-        GPT model has two configs: small and large. Small is used for debug purpose as it's fast
-
-    Raises
-    ------
-    ValueError
-        if there is no config for provided language model
+    device: str | None
+        on what device to train, if not provided will try to figure out what device to use such as:
+        if gpu (cuda or mps) is available will use it, if not - cpu
+    size: str
+        a model has two configs: small and large. Small is used for debug purpose as it's fast
+    dataset_fraction: float | None
+        for debugging purposes one might want to run training only on a small fraction of a dataset
     """
     # set seed for reproducibility
     set_seed(config.seed)
 
     # assign model's config to a variable
-    model_class_name = model_class.__name__
-    if model_class_name == "BigramLanguageModel":
-        model_config = config.model.bigram
-    elif model_class_name == "GPTLanguageModel":
-        model_config = config.model.gpt.size.small if debug else config.model.gpt.size.large
-    else:
-        msg = f"There is no config for class '{model_class_name}'"
-        logger.critical(msg)
-        raise ValueError(msg)
+    model_config = get_model_config(model_class, config, size)
 
     # Step 1: Load the data
     logger.info("Loading the data...")
@@ -59,6 +52,11 @@ def train(model_class: torch.nn.Module, *, debug: bool) -> None:
     data = torch.tensor(tokenizer.encode(text))
     logger.info("Tokenizing is done.")
 
+    # Step 2.1. Save tokenizer
+    logger.info("Saving tokenizer...")
+    pickle_dump(tokenizer, model_config.tokenizer_path)
+    logger.info("Tokenizer is saved.")
+
     # Step 3: Create data loaders
     logger.info("Preparing data loaders...")
     # Step 3.1. Split data into train/test split
@@ -66,12 +64,12 @@ def train(model_class: torch.nn.Module, *, debug: bool) -> None:
     train_data, test_data = data[:test_split], data[test_split:]
     # Step 3.2. Create data loaders
     train_dataloader = DataLoader(
-        NextTokenDataset(train_data, model_config.context_size),
+        NextTokenDataset(train_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
         num_workers=config.dataloader.num_workers,
     )
     test_dataloader = DataLoader(
-        NextTokenDataset(test_data, model_config.context_size),
+        NextTokenDataset(test_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
         num_workers=config.dataloader.num_workers,
     )
@@ -81,7 +79,14 @@ def train(model_class: torch.nn.Module, *, debug: bool) -> None:
     logger.info("Staring training...")
     model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
     optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
-    trainer = Trainer(model, optimizer, train_dataloader, test_dataloader, device=get_device())
+    trainer = Trainer(
+        model,
+        optimizer,
+        train_dataloader,
+        test_dataloader,
+        device=device or get_device(),
+        checkpoint_model_path=model_config.checkpoint_model_path,
+    )
     trainer.train(epochs=model_config.epochs)
     logger.info("Training is finished")
 
@@ -89,19 +94,35 @@ def train(model_class: torch.nn.Module, *, debug: bool) -> None:
 def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
     parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
-    models = {
-        "bigram": BigramLanguageModel,
-        "gpt": GPTLanguageModel,
-    }
-    parser.add_argument("--model", "-m", type=str, help="Bigram or GPT", choices=list(models), required=True)
+    models = {"bigram": BigramLanguageModel, "gpt": GPTLanguageModel}
     parser.add_argument(
-        "--debug",
-        "-d",
-        action="store_true",
-        help="Do you want to run fast training for debug purpose?",
+        "--model",
+        "-m",
+        choices=list(models),
+        help="Bigram or GPT",
+        required=True,
+        type=str,
+    )
+    parser.add_argument(
+        "--size",
+        "-s",
+        choices=["small", "large"],
+        help="The size of the model (small or large)",
+    )
+    parser.add_argument(
+        "--device",
+        help="Optionally you can select device on which the model will be trained",
+        required=False,
+        type=str,
+    )
+    parser.add_argument(
+        "--dataset-fraction",
+        help="For debugging purpose you can run training only on a fraction of the dataset",
+        required=False,
+        type=float,
     )
     args = parser.parse_args()
-    train(models[args.model], debug=args.debug)
+    train(models[args.model], args.device, args.size, args.dataset_fraction)
 
 
 if __name__ == "__main__":

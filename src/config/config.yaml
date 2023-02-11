@@ -17,11 +17,17 @@ dataloader:
   num_workers: 4
 
 model:
+  checkpoint_folder: "models"
+  tokenizer_folder: ${model.checkpoint_folder}/tokenizers
   bigram:
-    batch_size: 32
-    context_size: 8 # what is the maximum number of tokens to use during forward pass
-    epochs: 1
-    learning_rate: 1e-2
+    size:
+      large:
+        batch_size: 32
+        context_size: 8 # what is the maximum number of tokens to use during forward pass
+        epochs: 1
+        learning_rate: 1e-2
+        checkpoint_model_path: ${model.checkpoint_folder}/bigram_model.pth.tar
+        tokenizer_path: ${model.tokenizer_folder}/tokenizer_bigram.pkl
   gpt:
     size:
       large:
@@ -35,6 +41,8 @@ model:
         batch_size: 64
         learning_rate: 3e-4
         epochs: 1
+        checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_large.pth.tar
+        tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_large.pkl
       small:
         embeddings_size: 64
         context_size: 8
@@ -46,3 +54,5 @@ model:
         batch_size: 32
         learning_rate: 3e-4
         epochs: 1
+        checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
+        tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_small.pkl

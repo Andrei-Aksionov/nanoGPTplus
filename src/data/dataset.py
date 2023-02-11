@@ -1,3 +1,5 @@
+from math import ceil
+
 import numpy as np
 import torch
 from torch import Tensor
@@ -5,7 +7,7 @@ from torch.utils.data import Dataset
 
 
 class NextTokenDataset(Dataset):
-    def __init__(self, data: np.ndarray, block_size: int) -> None:
+    def __init__(self, data: np.ndarray, block_size: int, fraction: float | None = None) -> None:
         """Create custom torch Dataset that returns inputs and targets.
 
         Targets are essentially the same as inputs, but shifted by one element to the right.
@@ -23,14 +25,18 @@ class NextTokenDataset(Dataset):
             array from where pairs of inputs and targets will be generated
         block_size : int
             the length of a sequence that the model will process
+        fraction: float | None
+            for debugging purposes one might want to use only a small fraction of the dataset
         """
         super().__init__()
 
         self.data = data
         self.block_size = block_size
+        self.fraction = fraction
 
     def __len__(self) -> int:
-        return len(self.data) - self.block_size - 1
+        size = len(self.data) - self.block_size - 1
+        return ceil(size * self.fraction) if self.fraction else size
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
         array = self.data[index : index + self.block_size + 1]
