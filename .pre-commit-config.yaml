@@ -1,38 +1,56 @@
 repos:
   # default hooks
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.4.0
-  hooks:
-  - id: check-yaml
-  - id: end-of-file-fixer
-  - id: trailing-whitespace
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
 
-  # black formatter
-- repo: https://github.com/psf/black
-  rev: 23.1.0
-  hooks:
-  - id: black
-    language_version: python3.10
-  - id: black-jupyter
+    # black formatter
+  - repo: https://github.com/psf/black
+    rev: 23.1.0
+    hooks:
+      - id: black
+        language_version: python3.10
+      - id: black-jupyter
 
-  # markdown
-- repo: https://github.com/igorshubovych/markdownlint-cli
-  rev: v0.33.0
-  hooks:
-  - id: markdownlint-fix
-    args:
-    - --disable
-    - MD013 # line-length
-    - MD033 # no-inline-html
+    # markdown
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.33.0
+    hooks:
+      - id: markdownlint-fix
+        args:
+          - --disable
+          - MD013 # line-length
+          - MD033 # no-inline-html
 
-  # pyproject
-- repo: https://github.com/abravalheri/validate-pyproject
-  rev: v0.12.1
-  hooks:
-  - id: validate-pyproject
+    # pyproject
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.12.1
+    hooks:
+      - id: validate-pyproject
 
-  # ruff
-- repo: https://github.com/charliermarsh/ruff-pre-commit
-  rev: 'v0.0.245'
-  hooks:
-  - id: ruff
+    # ruff
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: "v0.0.245"
+    hooks:
+      - id: ruff
+
+    # secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: "detect-secrets"
+        args: ["--exclude-files", '.*\.ipynb$']
+      - id: detect-secrets
+        name: "detect-secrets-jupyter"
+        args:
+          [
+            "--exclude-files",
+            ".*[^i][^p][^y][^n][^b]$",
+            "--exclude-lines",
+            '"(hash|id|image/\w+)":.*',
+          ]
