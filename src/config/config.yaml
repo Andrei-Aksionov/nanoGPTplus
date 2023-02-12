@@ -37,6 +37,7 @@ model:
         num_heads: 6
         feed_forward_scaling: 4
         num_layers: 6
+        bias: true
         dropout: 0.2
         batch_size: 64
         learning_rate: 3e-4
@@ -50,6 +51,7 @@ model:
         num_heads: 2
         feed_forward_scaling: 4
         num_layers: 2
+        bias: true
         dropout: 0.2
         batch_size: 32
         learning_rate: 3e-4

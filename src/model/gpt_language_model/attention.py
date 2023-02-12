@@ -208,3 +208,81 @@ class MultiHeadAttention(nn.Module):
         out = torch.cat([h(x) for h in self.heads], dim=-1)
         out = self.projection(out)
         return self.dropout(out)
+
+
+# TODO: remove below line
+# flake8: noqa
+class CausalSelfAttention(nn.Module):
+    def __init__(self, embeddings_size: int, context_size: int, num_heads: int, bias: bool, dropout: float) -> None:
+        super().__init__()
+
+        if embeddings_size % num_heads != 0:
+            msg = "Embeddings size should be divisible by number of heads without residual, "
+            f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
+            raise ValueError(msg)
+
+        self.embeddings_size = embeddings_size
+        self.context_size = context_size
+        self.num_heads = num_heads
+        # self.bias = bias
+        self.dropout = dropout
+
+        # key, query and value projections for all heads in a single batch, hence `* 3`
+        self.causal_self_attention = nn.Linear(embeddings_size, embeddings_size * 3, bias=bias)
+        # output projection
+        self.causal_projection = nn.Linear(embeddings_size, embeddings_size, bias=bias)
+        # regularization
+        self.attention_dropout = nn.Dropout(self.dropout)
+        self.residual_dropout = nn.Dropout(self.dropout)
+
+        # TODO: why it's called 'bias'?
+        self.register_buffer(
+            "bias",
+            torch.tril(
+                torch.ones(self.context_size, self.context_size),
+            ).view(1, 1, self.context_size, self.context_size),
+        )
+        # TODO: this should also work
+        # self.register_buffer("bias", torch.tril(torch.ones(1, 1, self.context_size, self.context_size)))
+        # TODO: most likely we don't need 4 dim tril, 2 dim is enough
+
+    def forward(self, x: Tensor) -> Tensor:
+        # batch, sequence length, embedding size
+        B, T, C = x.shape
+
+        # calculate query, key and value for all heads in the batch and split into 3 chunks
+        # TODO: most likely (B, T, C // 3)
+        # temp = self.causal_self_attention(x) # (B, T, C * 3)
+        # query, key, value = self.causal_self_attention(x).split(self.embeddings_size, dim=2)  # TODO: maybe dim=-1
+        # query, key, value = temp.split(self.embeddings_size, dim=2) # (B, T, C)
+
+        # (B, T, C) -> (B, T, C * 3) -> (B, T, C)
+        query, key, value = self.causal_self_attention(x).split(self.embeddings_size, dim=2)  # TODO: maybe dim=-1
+
+        # TODO: is transpose(1,2) == .mT?
+        key = key.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+        # key = key.view(B, T, self.num_heads, -1).transpose(1, 2)  # (B, nh, T, hs)
+        query = query.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+        value = value.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+
+        attention_scores: Tensor = query @ key.mT  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+        head_size = key.shape[-1]
+        attention_scores *= head_size**-0.5  # (B, nh, T, T)
+
+        # NOTE: if to use 2 dim tril -> self.bias[:T, :T]
+        attention_scores = attention_scores.masked_fill(self.bias[:, :, :T, :T] == 0, float("-inf"))  # (B, nh, T, T)
+
+        attention_scores = F.softmax(attention_scores, dim=-1)  # (B, nh, T, T)
+        attention_scores = self.attention_dropout(attention_scores)  # (B, nh, T, T)
+
+        y = attention_scores @ value  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
+
+        y = y.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
+
+        # out projection
+        y = self.causal_projection(y)
+        # TODO: why do we need residual dropout here? Maybe wrong naming?
+        # perhaps proj_dropout
+        y = self.residual_dropout(y)
+
+        return y

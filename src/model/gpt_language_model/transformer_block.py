@@ -1,7 +1,26 @@
 from torch import Tensor, nn
 
-from src.model.gpt_language_model.attention import MultiHeadAttention
+from src.model.gpt_language_model.attention import (
+    CausalSelfAttention,
+    MultiHeadAttention,
+)
 from src.model.gpt_language_model.feed_forward import FeedForward
+
+
+# TODO: remove line below
+# flake8: noqa
+# cSpell:disable
+class LayerNorm(nn.LayerNorm):
+    # def __init__(self, normalized_shape: _shape_t, eps: float = 0.00001, elementwise_affine: bool = True, device=None, dtype=None) -> None:
+    #     super().__init__(normalized_shape, eps, elementwise_affine, device, dtype)
+    def __init__(self, normalized_shape, bias, **kwargs) -> None:
+        super().__init__(normalized_shape, **kwargs)
+        if not bias:
+            self.bias = None
+
+
+# TODO: remove line below
+# cSpell:enable
 
 
 class TransformerBlock(nn.Module):
@@ -11,6 +30,7 @@ class TransformerBlock(nn.Module):
         context_size: int,
         head_size: int | None,
         num_heads: int,
+        bias: bool,
         dropout: float,
         feed_forward_scaling: int,
         *,
@@ -35,6 +55,8 @@ class TransformerBlock(nn.Module):
             without residual
         num_heads : int
             how many self-attention heads to use
+        bias: bool
+            whether to use bias or not: without bias might be a bit better and faster
         dropout : float
             how many connection between tokens are dropped during each forward pass
         feed_forward_scaling: int
@@ -49,21 +71,34 @@ class TransformerBlock(nn.Module):
         self.context_size = context_size
         self.head_size = head_size
         self.num_heads = num_heads
+        self.bias = bias
         self.dropout = dropout
         self.feed_forward_scaling = feed_forward_scaling
         self.is_decoder = is_decoder
 
-        self.self_attention = MultiHeadAttention(
+        # self.self_attention = MultiHeadAttention(
+        #     embeddings_size=self.embeddings_size,
+        #     context_size=self.context_size,
+        #     head_size=self.head_size,
+        #     num_heads=self.num_heads,
+        #     dropout=self.dropout,
+        #     is_decoder=self.is_decoder,
+        # )
+        self.self_attention = CausalSelfAttention(
             embeddings_size=self.embeddings_size,
             context_size=self.context_size,
-            head_size=self.head_size,
             num_heads=self.num_heads,
+            bias=self.bias,
             dropout=self.dropout,
-            is_decoder=self.is_decoder,
         )
-        self.feed_forward = FeedForward(self.embeddings_size, self.feed_forward_scaling, self.dropout)
-        self.layer_norm_1 = nn.LayerNorm(self.embeddings_size)
-        self.layer_norm_2 = nn.LayerNorm(self.embeddings_size)
+        self.feed_forward = FeedForward(
+            embeddings_size=self.embeddings_size,
+            bias=self.bias,
+            scaling=self.feed_forward_scaling,
+            dropout=self.dropout,
+        )
+        self.layer_norm_1 = LayerNorm(normalized_shape=self.embeddings_size, bias=self.bias)
+        self.layer_norm_2 = LayerNorm(normalized_shape=self.embeddings_size, bias=self.bias)
 
     def forward(self, x: Tensor) -> Tensor:
         """Apply transformer block with layer norm, self-attention and feed-forward.

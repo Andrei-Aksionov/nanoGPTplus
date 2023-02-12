@@ -15,6 +15,7 @@ class GPTLanguageModel(nn.Module):
         num_heads: int,
         feed_forward_scaling: int,
         num_layers: int,
+        bias: bool,
         dropout: float,
     ) -> None:
         """Create Generative Pre-trained Transformer model (decoder part of transformer architecture).
@@ -37,6 +38,8 @@ class GPTLanguageModel(nn.Module):
             than input and output sizes, `feed_forward_scaling` specifies by how much
         num_layers : int
             how many transformer blocks to use
+        bias: bool
+            whether to use bias or not: without bias might be a bit better and faster
         dropout : float
             how many connection between tokens are dropped during each forward pass
         """
@@ -47,9 +50,10 @@ class GPTLanguageModel(nn.Module):
         self.context_size = context_size
         self.head_size = head_size
         self.num_heads = num_heads
-        self.num_layers = num_layers
-        self.dropout = dropout
         self.feed_forward_scaling = feed_forward_scaling
+        self.num_layers = num_layers
+        self.bias = bias
+        self.dropout = dropout
 
         self.token_embedding_table = nn.Embedding(self.vocab_size, self.embeddings_size)
         # since attention doesn't have any notion of space and we want to use spatial information we need to implement
@@ -64,6 +68,7 @@ class GPTLanguageModel(nn.Module):
                     context_size=self.context_size,
                     head_size=self.head_size,
                     num_heads=self.num_heads,
+                    bias=self.bias,
                     dropout=self.dropout,
                     feed_forward_scaling=self.feed_forward_scaling,
                     is_decoder=True,
