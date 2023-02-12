@@ -9,6 +9,7 @@ from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
 from src.utils import get_device, grab_arguments, set_seed
+from src.utils.arguments import RangeChecker
 from src.utils.model import get_model_config, pickle_dump
 
 
@@ -117,6 +118,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--dataset-fraction",
+        choices=RangeChecker(0, 1, inclusive_start=False),
         help="For debugging purpose you can run training only on a fraction of the dataset",
         required=False,
         type=float,
