@@ -87,6 +87,7 @@ class TransformerBlock(nn.Module):
         self.self_attention = CausalSelfAttention(
             embeddings_size=self.embeddings_size,
             context_size=self.context_size,
+            head_size=self.head_size,
             num_heads=self.num_heads,
             bias=self.bias,
             dropout=self.dropout,

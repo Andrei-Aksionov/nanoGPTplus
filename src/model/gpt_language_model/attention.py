@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from loguru import logger
 from torch import Tensor, nn
 
 
@@ -213,24 +214,42 @@ class MultiHeadAttention(nn.Module):
 # TODO: remove below line
 # flake8: noqa
 class CausalSelfAttention(nn.Module):
-    def __init__(self, embeddings_size: int, context_size: int, num_heads: int, bias: bool, dropout: float) -> None:
+    def __init__(
+        self,
+        embeddings_size: int,
+        context_size: int,
+        head_size: None | int,
+        num_heads: int,
+        bias: bool,
+        dropout: float,
+    ) -> None:
         super().__init__()
 
-        if embeddings_size % num_heads != 0:
-            msg = "Embeddings size should be divisible by number of heads without residual, "
-            f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
-            raise ValueError(msg)
+        if not head_size:
+            if embeddings_size % num_heads != 0:
+                msg = "Embeddings size should be divisible by number of heads without residual, "
+                f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
+                raise ValueError(msg)
+            head_size = embeddings_size // num_heads
+            # TODO: decide what to do with this
+        logger.debug(
+            "Embeddings_size {}, head_size {}, num_heads {}, head_size*num_heads={}".format(
+                embeddings_size, head_size, num_heads, head_size * num_heads
+            )
+        )
 
         self.embeddings_size = embeddings_size
         self.context_size = context_size
+        self.head_size = head_size
         self.num_heads = num_heads
         self.bias = bias
         self.dropout = dropout
 
         # key, query and value projections (hence `3 * embeddings_size`) for all heads in a single batch
-        self.causal_self_attention = nn.Linear(embeddings_size, 3 * embeddings_size, bias=bias)
+        self.causal_self_attention = nn.Linear(embeddings_size, 3 * self.head_size * self.num_heads, bias=bias)
         # output projection
-        self.projection = nn.Linear(embeddings_size, embeddings_size, bias=bias)
+        # self.projection = nn.Linear(embeddings_size, embeddings_size, bias=bias)
+        self.projection = nn.Linear(self.head_size * self.num_heads, embeddings_size, bias=bias)
         # regularization
         self.attention_dropout = nn.Dropout(self.dropout)
         self.projection_dropout = nn.Dropout(self.dropout)
@@ -241,14 +260,18 @@ class CausalSelfAttention(nn.Module):
         # batch, sequence length, embedding size
         B, T, C = x.shape  # noqa: N806
 
-        query, key, value = self.causal_self_attention(x).split(
-            self.embeddings_size,
-            dim=-1,
-        )  # (B, T, C) -> (B, T, C * 3) -> (B, T, C)
+        # query, key, value = self.causal_self_attention(x).split(
+        #     self.embeddings_size,
+        #     dim=-1,
+        # )  # (B, T, C) -> (B, T, C * 3) -> (B, T, C)
+        query, key, value = self.causal_self_attention(x).split(self.head_size * self.num_heads, dim=-1)
 
-        key = key.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
-        query = query.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
-        value = value.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+        # key = key.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+        # query = query.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+        # value = value.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
+        key = key.view(B, T, self.num_heads, self.head_size).transpose(1, 2)
+        query = query.view(B, T, self.num_heads, self.head_size).transpose(1, 2)
+        value = value.view(B, T, self.num_heads, self.head_size).transpose(1, 2)
 
         attention_scores = query @ key.mT  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         attention_scores *= key.shape[-1] ** -0.5  # (B, nh, T, T)
@@ -257,7 +280,10 @@ class CausalSelfAttention(nn.Module):
         attention_scores = self.attention_dropout(attention_scores)  # (B, nh, T, T)
 
         output = attention_scores @ value  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-        output = output.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
+        # output = output.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
+        output = (
+            output.transpose(1, 2).contiguous().view(B, T, self.head_size * self.num_heads)
+        )  # re-assemble all head outputs side by side
         # output projection
         output = self.projection(output)
         output = self.projection_dropout(output)
