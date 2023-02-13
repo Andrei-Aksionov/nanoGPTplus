@@ -1,6 +1,5 @@
 import torch
 import torch.nn.functional as F
-from loguru import logger
 from torch import Tensor, nn
 
 
@@ -10,6 +9,7 @@ class SelfAttentionHead(nn.Module):
         embeddings_size: int,
         context_size: int,
         head_size: int,
+        bias: bool,
         dropout: float,
         *,
         is_decoder: bool,
@@ -25,6 +25,8 @@ class SelfAttentionHead(nn.Module):
             weighted averaging of value of each token
         head_size : int
             the size of output of self-attention
+        bias : bool
+            whether to use bias or not: without bias might be a bit better and faster (but it's not for sure)
         dropout : float
             how many connection between tokens are dropped during each forward pass
         is_decoder : bool
@@ -35,16 +37,19 @@ class SelfAttentionHead(nn.Module):
         self.embeddings_size = embeddings_size
         self.context_size = context_size
         self.head_size = head_size
+        self.bias = bias
         self.is_decoder = is_decoder
 
         # what don't need `bias` because we simply want to do matrix multiplications
-        self.key_weights = nn.Linear(embeddings_size, head_size, bias=False)
-        self.query_weights = nn.Linear(embeddings_size, head_size, bias=False)
-        self.value_weights = nn.Linear(embeddings_size, head_size, bias=False)
+        self.key_weights = nn.Linear(embeddings_size, head_size, bias=self.bias)
+        self.query_weights = nn.Linear(embeddings_size, head_size, bias=self.bias)
+        self.value_weights = nn.Linear(embeddings_size, head_size, bias=self.bias)
+
         # If you have parameters in your model, which should be saved and restored in the state_dict,
         # but not trained by the optimizer, you should register them as buffers.
         # Buffers won't be returned in model.parameters(), so that the optimizer won't have a change to update them.
-        self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
+        if self.is_decoder:
+            self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
         self.dropout = nn.Dropout(dropout)
 
@@ -75,18 +80,17 @@ class SelfAttentionHead(nn.Module):
         Tensor
             output vector representation of x of size (batch, time-step, head_size)
         """
-        # batch, time-step, channels
-        B, T, _ = x.shape  # noqa: N806
+        # batch, time-step, channels (embeddings size)
+        B, T, C = x.shape  # noqa: N806
 
-        # here and below `C` means `head_size`, not channels of input
-        key = self.key_weights(x)  # (B, T, C)
-        query = self.query_weights(x)  # (B, T, C)
-        value = self.value_weights(x)  # (B, T, C)
+        key = self.key_weights(x)  # (B, T, head_size)
+        query = self.query_weights(x)  # (B, T, head_size)
+        value = self.value_weights(x)  # (B, T, head_size)
 
         # first to obtaining attention scores: dot product of key and query
-        attention_scores = query @ key.mT  # (B, T, C) @ (B, C, T) -> (B, T, T)
+        attention_scores = query @ key.mT  # (B, T, head_size) @ (B, head_size, T) -> (B, T, T)
 
-        # In order to preserve 1 unit variance of the product of multiplication of two vectors
+        # In order to preserve 1 unit variance of the dot product of two vectors
         # we need to divide by square root of the features size (in our case - attention head size)
         # We need it to make sure that the values after softmax are well spread out, otherwise in worst
         # case scenario the values after the softmax will converge to one-hot encoding (like [0, 0, 1]) and
@@ -114,7 +118,7 @@ class SelfAttentionHead(nn.Module):
         attention_scores = self.dropout(attention_scores)
 
         # perform the weighted aggregation of the values
-        return attention_scores @ value  # (B, T, T) @ (B, T, C) -> (B, T, C)
+        return attention_scores @ value  # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
 
 
 class MultiHeadAttention(nn.Module):
@@ -122,8 +126,9 @@ class MultiHeadAttention(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: int | None,
+        head_size: None | int,
         num_heads: int,
+        bias: bool,
         dropout: float,
         *,
         is_decoder: bool,
@@ -142,12 +147,14 @@ class MultiHeadAttention(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : int | None
+        head_size : None | int
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
-            without residual
+            without remainder
         num_heads : int
             how many self-attention heads to use
+        bias : bool
+            whether to use bias or not: without bias might be a bit better and faster (but it's not for sure)
         dropout : float
             how many connection between tokens are dropped during each forward pass
         is_decoder : bool
@@ -156,13 +163,13 @@ class MultiHeadAttention(nn.Module):
         Raises
         ------
         ValueError
-            if `embeddings_size` cannot be divided by `num_heads` without residual
+            if `embeddings_size` cannot be divided by `num_heads` without remainder
         """
         super().__init__()
 
         if not head_size:
             if embeddings_size % num_heads != 0:
-                msg = "Embeddings size should be divisible by number of heads without residual, "
+                msg = "Embeddings size should be divisible by number of heads without remainder, "
                 f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
                 raise ValueError(msg)
             head_size = embeddings_size // num_heads
@@ -171,6 +178,7 @@ class MultiHeadAttention(nn.Module):
         self.context_size = context_size
         self.head_size = head_size
         self.num_heads = num_heads
+        self.bias = bias
         self.dropout = dropout
         self.is_decoder = is_decoder
 
@@ -180,6 +188,7 @@ class MultiHeadAttention(nn.Module):
                     embeddings_size=self.embeddings_size,
                     context_size=self.context_size,
                     head_size=self.head_size,
+                    bias=self.bias,
                     dropout=self.dropout,
                     is_decoder=self.is_decoder,
                 )
@@ -189,7 +198,7 @@ class MultiHeadAttention(nn.Module):
 
         # if after concatenation the size of channels is bigger than embeddings size
         # projection will scaled it down
-        self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size)
+        self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size, bias=self.bias)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -206,13 +215,14 @@ class MultiHeadAttention(nn.Module):
             output vector of the same size as input
         """
         # concatenate over channel dimension
-        out = torch.cat([h(x) for h in self.heads], dim=-1)
-        out = self.projection(out)
-        return self.dropout(out)
+        out = torch.cat(
+            [head(x) for head in self.heads],
+            dim=-1,
+        )  # num_heads * (B, T, head_size) -> (B, T, head_size * num_heads)
+        out = self.projection(out)  # (B, T, embeddings_size)
+        return self.dropout(out)  # (B, T, embeddings_size)
 
 
-# TODO: remove below line
-# flake8: noqa
 class CausalSelfAttention(nn.Module):
     def __init__(
         self,
@@ -222,21 +232,47 @@ class CausalSelfAttention(nn.Module):
         num_heads: int,
         bias: bool,
         dropout: float,
+        *,
+        is_decoder: bool,
     ) -> None:
+        """Do the same as multi-head attention but with a single matrix multiplication.
+
+        Instead of creating multiple heads and concatenating the result (in addition to creating separate matrices for
+        query, key and value for each head) we can do this in a single pass with a single weight matrix.
+
+        Parameters
+        ----------
+        embeddings_size : int
+            size of the embeddings - the size of input of self-attention
+        context_size : int
+            the number of tokens that will be used during calculation attention map and
+            weighted averaging of value of each token
+        head_size : None | int
+            the size of output of self-attention;
+            if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
+            without remainder
+        num_heads : int
+            how many self-attention heads to use
+        bias : bool
+            whether to use bias or not: without bias might be a bit better and faster (but it's not for sure)
+        dropout : float
+            how many connection between tokens are dropped during each forward pass
+        is_decoder : bool
+            if it's a decoder masking of 'future' tokens will be applied
+
+        Raises
+        ------
+        ValueError
+            if `embeddings_size` cannot be divided by `num_heads` without remainder
+        """
         super().__init__()
 
         if not head_size:
             if embeddings_size % num_heads != 0:
-                msg = "Embeddings size should be divisible by number of heads without residual, "
+                msg = "Embeddings size should be divisible by the number of heads without a residual, "
                 f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
                 raise ValueError(msg)
             head_size = embeddings_size // num_heads
-            # TODO: decide what to do with this
-        logger.debug(
-            "Embeddings_size {}, head_size {}, num_heads {}, head_size*num_heads={}".format(
-                embeddings_size, head_size, num_heads, head_size * num_heads
-            )
-        )
 
         self.embeddings_size = embeddings_size
         self.context_size = context_size
@@ -244,48 +280,89 @@ class CausalSelfAttention(nn.Module):
         self.num_heads = num_heads
         self.bias = bias
         self.dropout = dropout
+        self.is_decoder = is_decoder
 
-        # key, query and value projections (hence `3 * embeddings_size`) for all heads in a single batch
+        # key, query and value projections (hence `3 * ...`) for all heads in a single batch
         self.causal_self_attention = nn.Linear(embeddings_size, 3 * self.head_size * self.num_heads, bias=bias)
         # output projection
-        # self.projection = nn.Linear(embeddings_size, embeddings_size, bias=bias)
         self.projection = nn.Linear(self.head_size * self.num_heads, embeddings_size, bias=bias)
         # regularization
         self.attention_dropout = nn.Dropout(self.dropout)
         self.projection_dropout = nn.Dropout(self.dropout)
         # triangular matrix for masking 'future' tokens
-        self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
+        if self.is_decoder:
+            self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
     def forward(self, x: Tensor) -> Tensor:
-        # batch, sequence length, embedding size
+        """Do multi-head attention in a single pass.
+
+        Multiply by weight matrix -> split the result into query, key and value -> reshape each one of them
+        into shape (batch, num_heads, time-steps, head_size). The rest is similar to single self-attention head
+        forward pass.
+
+        Parameters
+        ----------
+        x : Tensor
+            input tensor of shape (batch, time-step, embedding size)
+
+        Returns
+        -------
+        Tensor
+            output tensor of the same shape as input: (batch, time-step, embedding size)
+        """
+        # notation:
+        # - B  | batch
+        # - T  | time-step (sequence length)
+        # - C  | embeddings size
+        # - hs | head size
+        # - nh | number of heads
+
         B, T, C = x.shape  # noqa: N806
 
-        # query, key, value = self.causal_self_attention(x).split(
-        #     self.embeddings_size,
-        #     dim=-1,
-        # )  # (B, T, C) -> (B, T, C * 3) -> (B, T, C)
-        query, key, value = self.causal_self_attention(x).split(self.head_size * self.num_heads, dim=-1)
+        # single pass for query, key and value; that's why we need to split into 3 parts
+        query, key, value = self.causal_self_attention(x).split(
+            self.head_size * self.num_heads,
+            dim=-1,
+        )  # (B, T, C) -> (B, T, 3 * hs * nh) -> (B, T, hs * nh)
 
-        # key = key.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
-        # query = query.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
-        # value = value.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)  # (B, nh, T, hs)
-        key = key.view(B, T, self.num_heads, self.head_size).transpose(1, 2)
-        query = query.view(B, T, self.num_heads, self.head_size).transpose(1, 2)
-        value = value.view(B, T, self.num_heads, self.head_size).transpose(1, 2)
+        # transform (B, T, nh * hs) -> (B, nh, T, hs) so it's similar to multi-head attention
+        key = key.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
+        query = query.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
+        value = value.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
 
+        # to obtain attention scores first do dot product of query and key
         attention_scores = query @ key.mT  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
+
+        # In order to preserve 1 unit variance of the dot product of two vectors
+        # we need to divide by square root of the features size (in our case - attention head size)
+        # We need it to make sure that the values after softmax are well spread out, otherwise in worst
+        # case scenario the values after the softmax will converge to one-hot encoding (like [0, 0, 1]) and
+        # that will mean that the attention will be on a single (or couple of) tokens, and we want it to be
+        # spread out (like [0.2, 0.1, 0.7])
+        # we want to aggregate information not from a single node
         attention_scores *= key.shape[-1] ** -0.5  # (B, nh, T, T)
-        attention_scores = attention_scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))  # (B, nh, T, T)
+
+        # if it's a decoder we need to mask 'future' tokens with '-inf' value
+        if self.is_decoder:
+            # [0.9, -0.6, 0.3] -> [0.9, -inf, -inf]
+            # [0.1, 0.5, -0.1] -> [0.1, 0.5, -inf]
+            # [0.1, 0.2, 0.3]  -> [0.1, 0.2, 0.3]
+            # and after softmax `-inf` becomes 0
+            # this doesn't allow current token communicate with future ones
+            attention_scores = attention_scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))  # (B, nh, T, T)
+
+        # since we want to do weighted averaging we need to transform attention scores into range [0, 1]
+        # and sum of all scores should be equal to 1; softmax is a good tool for it
         attention_scores = F.softmax(attention_scores, dim=-1)  # (B, nh, T, T)
+
+        # randomly prevent some nodes from communicating, some of theme randomly are set to zero
+        # helps prevent overfitting
         attention_scores = self.attention_dropout(attention_scores)  # (B, nh, T, T)
 
+        # perform the weighted aggregation of the values
         output = attention_scores @ value  # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-        # output = output.transpose(1, 2).contiguous().view(B, T, C)  # re-assemble all head outputs side by side
-        output = (
-            output.transpose(1, 2).contiguous().view(B, T, self.head_size * self.num_heads)
-        )  # re-assemble all head outputs side by side
+        # re-assemble all head outputs side by side
+        output = output.transpose(1, 2).reshape(B, T, self.head_size * self.num_heads)  # (B, T, hs * nh)
         # output projection
-        output = self.projection(output)
-        output = self.projection_dropout(output)
-
-        return output
+        output = self.projection(output)  # (B, T, C)
+        return self.projection_dropout(output)  # (B, T, C)

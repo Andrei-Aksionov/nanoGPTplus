@@ -33,7 +33,7 @@ model:
       large:
         embeddings_size: 384
         context_size: 256
-        head_size: 32 # either should be provided explicitly or calculated implicitly as embeddings_size // num_heads
+        head_size: null # either should be provided explicitly or calculated implicitly as embeddings_size // num_heads
         num_heads: 6
         feed_forward_scaling: 4
         num_layers: 6
@@ -47,7 +47,7 @@ model:
       small:
         embeddings_size: 64
         context_size: 8
-        head_size: 8
+        head_size: null
         num_heads: 2
         feed_forward_scaling: 4
         num_layers: 2

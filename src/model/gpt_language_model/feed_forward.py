@@ -33,8 +33,7 @@ class FeedForward(nn.Module):
 
         self.net = nn.Sequential(
             nn.Linear(self.embeddings_size, self.scaling * self.embeddings_size, bias=self.bias),
-            # TODO: try GELU
-            nn.ReLU(),
+            nn.GELU(approximate="tanh"),
             nn.Linear(self.scaling * self.embeddings_size, self.embeddings_size, bias=self.bias),
             nn.Dropout(self.dropout),
         )
