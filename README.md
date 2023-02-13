@@ -96,12 +96,20 @@ The purpose of it is to better understand how Transformer architecture works by 
 
 ***
 
-## Additional: git pre-commit hook
+## Additional: pre-commit hooks
 
-In order to run `black` formatter before each commit you need to add them into `.git/hooks` folder either manually or with helper script:
+In order to install pre-commit hooks run:
 
 ```bash
-sh .add_git_hooks.sh`
+pre-commit install
 ```
 
-This script will put `pre-commit` file into `.git/hooks` folder of the project and make it executable.
+Pre-commit hooks will be executed before each commit. In addition all the pre-commit hooks will be run per each PR via github-workflow (no need to add or change anything).
+
+The list of all hooks one can find in a config fils: `.pre-commit-config.yaml`
+
+**Note**: for the sake of speed pre-commit hooks will be executed only on changed files. If it's needed to run on all files execute:
+
+```bash
+pre-commit run --all-files
+```

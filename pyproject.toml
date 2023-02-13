@@ -40,6 +40,7 @@ ignore = [
   "D101", # Missing docstring in public class
   "D105", # Missing docstring in magic method
   "EM", # flake8-errmsg
+  "FBT", # flake8-boolean-trap
   "G", # flake8-logging-format
   "INP001", # File {filename} is part of an implicit namespace package. Add an __init__.py
   "N812", # Lowercase {name} imported as non-lowercase {asname}
