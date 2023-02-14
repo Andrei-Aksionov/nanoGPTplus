@@ -178,7 +178,13 @@ class GPTLanguageModel(nn.Module):
         )
 
     @torch.no_grad()
-    def generate(self, idx: Tensor, max_new_tokens: int) -> Tensor:
+    def generate(
+        self,
+        idx: Tensor,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+        top_k_logits: None | int = None,
+    ) -> Tensor:
         """Generate new character after the current one.
 
         Parameters
@@ -187,6 +193,17 @@ class GPTLanguageModel(nn.Module):
             index of the current character
         max_new_tokens : int
             number of characters to be generated
+        temperature : float, optional
+            The temperature determines how greedy the generative model is:
+            If the temperature is low, the probabilities to sample other but the class with the highest log probability
+            will be small, and the model will probably output the most correct text, but rather boring, with small
+            variation.
+            If the temperature is high, the model can output, with rather high probability, other words than those with
+            the highest probability. The generated text will be more diverse, but there is a higher possibility of
+            grammar mistakes and generation of nonsense.
+            https://ai.stackexchange.com/questions/32477/what-is-the-temperature-in-the-gpt-models, by default 1.0
+        top_k_logits : None | int, optional
+            only top K logits (with the highest value) will be kept, by default None
 
         Returns
         -------
@@ -199,8 +216,14 @@ class GPTLanguageModel(nn.Module):
             context = idx[:, -self.context_size :]
             # get the predictions
             logits = self(context, inference=True)  # (B, T, C), with inference=True -> (1, 1, C)
-            # focus only on the last time step
-            logits = logits[:, -1, :]  # becomes (B, C)
+            # focus only on the last time step and scale by desired temperature
+            logits = logits[:, -1, :] / temperature  # becomes (B, C)
+            if top_k_logits:
+                # topk returns rearranged tensor where the first column contains the highest values,
+                # the last column - the smallest values from top K logits ...
+                values, _ = torch.topk(logits, min(top_k_logits, logits.shape[-1]))
+                # ... that's why we need to compare with the last column
+                logits[logits < values[:, -1]] = float("-inf")  # `-1:` is to preserve dimensionality
             # apply softmax on the predictions to get probabilities
             probs = F.softmax(logits, dim=-1)  # (B, C)
             # sample from the distribution
