@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from loguru import logger
 from torch import Tensor, nn
 
 from src.model.gpt_language_model.transformer_block import TransformerBlock
@@ -89,6 +90,19 @@ class GPTLanguageModel(nn.Module):
             self.token_embedding_table.weight = self.language_model_head.weight
 
         self.apply(self.__init_weights)
+        # report number of parameters
+        logger.info(
+            "GPT language model is created with number of parameters: {:.2f} million".format(
+                self.__get_parameters_number() / 1e6,
+            ),
+        )
+
+    def __get_parameters_number(self, exclude_positional_embeddings: bool = True) -> int:
+        """Return total number of parameters of the model without counting parameters of positional embeddings."""
+        params_count = sum(param.numel() for param in self.parameters())
+        if exclude_positional_embeddings:
+            params_count -= self.positional_embedding_table.weight.numel()
+        return params_count
 
     def __init_weights(self, module: "torch.nn.modules") -> None:
         """Initialize Embedding and Linear layers with a smaller std.
