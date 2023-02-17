@@ -1,4 +1,5 @@
 import math
+from functools import reduce
 
 import torch
 import torch.nn.functional as F
@@ -21,6 +22,7 @@ class GPTLanguageModel(nn.Module):
         bias: bool,
         dropout: float,
         weight_tying: bool = True,
+        weight_decay: None | float = None,
     ) -> None:
         """Create Generative Pre-trained Transformer model (decoder part of transformer architecture).
 
@@ -51,6 +53,8 @@ class GPTLanguageModel(nn.Module):
            softmax layers. This method also massively reduces the total number of parameters in the language models that
            it is applied to.
            https://paperswithcode.com/method/weight-tying, by default True
+        weight_decay: None | float
+            if provided will prepare parameters for optimizer
         """
         super().__init__()
 
@@ -64,6 +68,7 @@ class GPTLanguageModel(nn.Module):
         self.bias = bias
         self.dropout = dropout
         self.weigh_tying = weight_tying
+        self.weight_decay = weight_decay
 
         self.token_embedding_table = nn.Embedding(self.vocab_size, self.embeddings_size)
         # since attention doesn't have any notion of space and we want to use spatial information we need to implement
@@ -98,6 +103,10 @@ class GPTLanguageModel(nn.Module):
             if name.endswith("projection.weight"):
                 torch.nn.init.normal_(param, mean=0.0, std=0.2 / math.sqrt(2 * self.num_layers))
 
+        # configure parameters for optimizer that will be decay and that will not
+        if self.weight_decay:
+            self.optimizer_parameters = self.__optimizer_parameters(weight_decay=self.weight_decay)
+
         # report number of parameters
         logger.info(
             "GPT language model is created with number of parameters: {:.2f} million".format(
@@ -130,6 +139,46 @@ class GPTLanguageModel(nn.Module):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
+
+    def __optimizer_parameters(self, weight_decay: float) -> list[dict, dict]:
+        """Configure optimizer with weight decay for nn.Linear.
+
+        Parameters
+        ----------
+        weight_decay : float
+            weight decay (L2 penalty)
+
+        Returns
+        -------
+        list[dict, dict]
+            list of two dictionaries, containing parameter names that will have weight decay
+            and that will not accordingly
+
+        Raises
+        ------
+        ValueError
+            if model's layer are not in (nn.Linear, nn.LayerNorm, LayerNorm, nn.Embedding)
+        """
+        # separate out all parameters to those that will and won't experience regularizing weight decay
+        decay, no_decay = set(), set()
+        expected_weight_modules = (nn.Linear, nn.LayerNorm, LayerNorm, nn.Embedding)
+        for pn, _ in self.named_parameters():
+            # get the parent module by the parameter's name
+            module = reduce(lambda module, key: getattr(module, key), pn.split(".")[:-1], self)
+            if type(module) not in expected_weight_modules:
+                msg = f"Expected the module to be one of '{expected_weight_modules}', but got {type(module)}"
+                raise ValueError(msg)
+            if isinstance(module, nn.Linear) and pn.endswith("weight"):
+                decay.add(pn)
+            else:
+                no_decay.add(pn)
+
+        # create the pytorch optimizer object
+        param_dict = dict(self.named_parameters())
+        return [
+            {"params": [param_dict[pn] for pn in sorted(decay)], "weight_decay": weight_decay},
+            {"params": [param_dict[pn] for pn in sorted(no_decay)], "weight_decay": 0.0},
+        ]
 
     def forward(self, idx: Tensor, *, inference: bool = False) -> Tensor:
         """Do the whole forward pass for decoder part of transformer.

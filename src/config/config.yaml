@@ -42,6 +42,10 @@ model:
         weight_tying: true
         batch_size: 16
         learning_rate: 3e-4
+        weight_decay: 1e-1
+        betas:
+          - 0.9
+          - 0.95
         epochs: 1
         tqdm_update_interval: 1
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_large.pth.tar
@@ -58,6 +62,10 @@ model:
         weight_tying: true
         batch_size: 64
         learning_rate: 1e-3
+        weight_decay: 1e-1
+        betas:
+          - 0.9
+          - 0.95
         epochs: 1
         tqdm_update_interval: 1
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
@@ -74,6 +82,10 @@ model:
         weight_tying: true
         batch_size: 12
         learning_rate: 1e-3
+        weight_decay: 3e-1
+        betas:
+          - 0.9
+          - 0.95
         epochs: 1
         tqdm_update_interval: 100
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
