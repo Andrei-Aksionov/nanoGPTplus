@@ -17,6 +17,7 @@ class GPTLanguageModel(nn.Module):
         num_layers: int,
         bias: bool,
         dropout: float,
+        weight_tying: bool = True,
     ) -> None:
         """Create Generative Pre-trained Transformer model (decoder part of transformer architecture).
 
@@ -42,6 +43,11 @@ class GPTLanguageModel(nn.Module):
             whether to use bias or not: without bias might be a bit better and faster
         dropout : float
             how many connection between tokens are dropped during each forward pass
+        weight_tying: bool
+           Weight Tying improves the performance of language models by tying (sharing) the weights of the embedding and
+           softmax layers. This method also massively reduces the total number of parameters in the language models that
+           it is applied to.
+           https://paperswithcode.com/method/weight-tying, by default True
         """
         super().__init__()
 
@@ -54,6 +60,7 @@ class GPTLanguageModel(nn.Module):
         self.num_layers = num_layers
         self.bias = bias
         self.dropout = dropout
+        self.weigh_tying = weight_tying
 
         self.token_embedding_table = nn.Embedding(self.vocab_size, self.embeddings_size)
         # since attention doesn't have any notion of space and we want to use spatial information we need to implement
@@ -78,6 +85,8 @@ class GPTLanguageModel(nn.Module):
         )
         self.layer_norm = nn.LayerNorm(self.embeddings_size)  # final layer norm
         self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size)
+        if self.weigh_tying:
+            self.token_embedding_table.weight = self.language_model_head.weight
 
         self.apply(self.__init_weights)
 
