@@ -25,8 +25,8 @@ It is done via transforming each token embedding into key, query and value vecto
 
 Intuitively speaking:
 
-- key: what the token represents
-- query: what the token is interested in
+- query: what the token is interested in *(a vector you want to calculate attention for)*
+- key: what the token represents *(a vector you want to calculate attention against)*
 - value: if someone is interested in the token, that's the value will be returned
 
 As we obtain key and value vectors from token x itself (and not from external source) means that we perform self-attention.
