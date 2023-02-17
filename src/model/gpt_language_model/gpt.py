@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor, nn
 
-from src.model.gpt_language_model.transformer_block import TransformerBlock
+from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
 
 
 class GPTLanguageModel(nn.Module):
@@ -14,7 +14,7 @@ class GPTLanguageModel(nn.Module):
         vocab_size: int,
         embeddings_size: int,
         context_size: int,
-        head_size: int | None,
+        head_size: None | int,
         num_heads: int,
         feed_forward_scaling: int,
         num_layers: int,
@@ -33,7 +33,7 @@ class GPTLanguageModel(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : int | None
+        head_size : None | int
             the size of output of self-attention
         num_heads : int
             how many self-attention heads to use
@@ -70,7 +70,7 @@ class GPTLanguageModel(nn.Module):
         # positional embeddings (they will encode relative position of each token)
         # positional embeddings knows how to encode position of last N (context_size) tokens
         self.positional_embedding_table = nn.Embedding(self.context_size, self.embeddings_size)
-        self.embeddings_dropout = nn.Dropout(dropout)
+        self.embeddings_dropout = nn.Dropout(self.dropout)
         self.transformer_blocks = nn.Sequential(
             *[
                 TransformerBlock(
@@ -87,7 +87,7 @@ class GPTLanguageModel(nn.Module):
                 for _ in range(self.num_layers)
             ],
         )
-        self.layer_norm = nn.LayerNorm(self.embeddings_size)  # final layer norm
+        self.layer_norm = LayerNorm(self.embeddings_size, bias=self.bias)  # final layer norm
         self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size, bias=False)
         if self.weigh_tying:
             self.token_embedding_table.weight = self.language_model_head.weight

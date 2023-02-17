@@ -87,6 +87,7 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
         test_dataloader,
         device=device or get_device(),
         checkpoint_model_path=model_config.checkpoint_model_path,
+        tqdm_update_interval=model_config.tqdm_update_interval,
     )
     trainer.train(epochs=model_config.epochs)
     logger.info("Training is finished")
@@ -107,7 +108,7 @@ def main() -> None:
     parser.add_argument(
         "--size",
         "-s",
-        choices=["small", "large"],
+        choices=["small", "medium", "large"],
         help="The size of the model (small or large)",
     )
     parser.add_argument(

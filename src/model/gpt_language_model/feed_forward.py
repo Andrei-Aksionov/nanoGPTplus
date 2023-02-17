@@ -36,9 +36,12 @@ class FeedForward(nn.Module):
         self.net = nn.Sequential(
             OrderedDict(
                 [
-                    ("linear_1", nn.Linear(self.embeddings_size, self.scaling * self.embeddings_size, bias=self.bias)),
+                    ("c_fc", nn.Linear(self.embeddings_size, self.scaling * self.embeddings_size, bias=self.bias)),
                     ("gelu", nn.GELU(approximate="tanh")),
-                    ("linear_2", nn.Linear(self.scaling * self.embeddings_size, self.embeddings_size, bias=self.bias)),
+                    (
+                        "projection",
+                        nn.Linear(self.scaling * self.embeddings_size, self.embeddings_size, bias=self.bias),
+                    ),
                     ("dropout", nn.Dropout(self.dropout)),
                 ],
             ),

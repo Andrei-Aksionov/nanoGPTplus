@@ -14,7 +14,7 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
-        device: torch.device | None,
+        device: None | str | torch.device,
         loss: "torch.nn.modules" = None,
         checkpoint_model_path: str = "models/model.pth.tar",
         tqdm_update_interval: int = 100,
@@ -31,7 +31,7 @@ class Trainer:
             dataloader containing data for training
         eval_dataloader : DataLoader
             dataloader containing data for evaluation
-        device: torch.device | None
+        device: None | str | torch.device
             where the model and batch should be stored and executed
             if device is None, batch will be moved to the same device where the model is
         loss : torch.nn.modules, optional
