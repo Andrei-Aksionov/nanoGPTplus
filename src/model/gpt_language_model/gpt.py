@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn.functional as F
 from loguru import logger
@@ -90,6 +92,11 @@ class GPTLanguageModel(nn.Module):
             self.token_embedding_table.weight = self.language_model_head.weight
 
         self.apply(self.__init_weights)
+        # apply special scaled init to the residual projections, per GPT-2 paper
+        for name, param in self.named_parameters():
+            if name.endswith("projection.weight"):
+                torch.nn.init.normal_(param, mean=0.0, std=0.2 / math.sqrt(2 * self.num_layers))
+
         # report number of parameters
         logger.info(
             "GPT language model is created with number of parameters: {:.2f} million".format(
