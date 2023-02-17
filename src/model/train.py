@@ -1,4 +1,5 @@
 import argparse
+import inspect
 from pathlib import Path
 
 import torch
@@ -77,9 +78,24 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
     logger.info("Data loaders are prepared.")
 
     # Step 4: Train the model
+    # Step 4.1. Create model
     logger.info("Staring training...")
     model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
+    # Step 4.2. Configure optimizer
+    optimizer_parameters = model.optimizer_parameters if hasattr(model, "optimizer_parameters") else model.parameters()
+    # new PyTorch nightly has a new 'fused' option for AdamW that is much faster
+    if device == "cuda" and ("fused" in inspect.signature(torch.optim.AdamW).parameters):
+        logger.debug("Using fused AdamW")
+        extra_args = {"fused": True}
+    else:
+        extra_args = {}
+    optimizer = torch.optim.AdamW(
+        optimizer_parameters,
+        lr=model_config.learning_rate,
+        betas=model_config.betas,
+        **extra_args,
+    )
+    # Step 4.3. Start training
     trainer = Trainer(
         model,
         optimizer,

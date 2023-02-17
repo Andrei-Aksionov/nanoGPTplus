@@ -108,7 +108,7 @@ class GPTLanguageModel(nn.Module):
             self.optimizer_parameters = self.__optimizer_parameters(weight_decay=self.weight_decay)
 
         # report number of parameters
-        logger.info(
+        logger.debug(
             "GPT language model is created with number of parameters: {:.2f} million".format(
                 self.__get_parameters_number() / 1e6,
             ),
