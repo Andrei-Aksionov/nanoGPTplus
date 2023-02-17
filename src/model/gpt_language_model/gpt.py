@@ -71,7 +71,7 @@ class GPTLanguageModel(nn.Module):
         # positional embeddings knows how to encode position of last N (context_size) tokens
         self.positional_embedding_table = nn.Embedding(self.context_size, self.embeddings_size)
         self.embeddings_dropout = nn.Dropout(dropout)
-        self.blocks = nn.Sequential(
+        self.transformer_blocks = nn.Sequential(
             *[
                 TransformerBlock(
                     embeddings_size=self.embeddings_size,
@@ -82,12 +82,13 @@ class GPTLanguageModel(nn.Module):
                     dropout=self.dropout,
                     feed_forward_scaling=self.feed_forward_scaling,
                     is_decoder=True,
+                    use_causal_self_attention=True,
                 )
                 for _ in range(self.num_layers)
             ],
         )
         self.layer_norm = nn.LayerNorm(self.embeddings_size)  # final layer norm
-        self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size)
+        self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size, bias=False)
         if self.weigh_tying:
             self.token_embedding_table.weight = self.language_model_head.weight
 
@@ -172,7 +173,7 @@ class GPTLanguageModel(nn.Module):
         x = self.embeddings_dropout(x)  # (B, T, C)
 
         # apply multiple transformer blocks
-        x = self.blocks(x)  # (B, T, C)
+        x = self.transformer_blocks(x)  # (B, T, C)
         # apply final normalization and generate logits for each token in vocabulary
         x = self.layer_norm(x)  # (B, T, C)
 
