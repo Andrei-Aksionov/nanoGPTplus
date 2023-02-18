@@ -39,13 +39,13 @@ class NextTokenDataset(Dataset):
         return ceil(size * self.fraction) if self.fraction else size
 
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor]:
-        array = self.data[index : index + self.block_size + 1]
-        return array[:-1], array[1:]
+        chunk = self.data[index : index + self.block_size + 1]
+        return chunk[:-1], chunk[1:]
 
 
 class NextTokenRandomDataset(Dataset):
     def __init__(self, data: np.ndarray, block_size: int, max_iter: int) -> None:
-        """Create custom torch Dataset that returns inputs and targets by random sampling.
+        """Create custom torch Dataset that returns inputs and targets by random sampling with replacement.
 
         Targets are essentially the same as inputs, but shifted by one element to the right.
         It is done because we want to predict the next element in the sequence.
@@ -76,5 +76,5 @@ class NextTokenRandomDataset(Dataset):
     def __getitem__(self, _: int) -> tuple[Tensor, Tensor]:
         # instead of provided index it will be randomly sampled
         index = torch.randint(len(self.data) - self.block_size - 1, (1,))
-        array = self.data[index : index + self.block_size + 1]
-        return array[:-1], array[1:]
+        chunk = self.data[index : index + self.block_size + 1]
+        return chunk[:-1], chunk[1:]

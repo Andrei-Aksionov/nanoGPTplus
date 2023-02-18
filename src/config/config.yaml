@@ -41,11 +41,15 @@ model:
         dropout: 0.2
         weight_tying: true
         batch_size: 16
+        # optimizer
         learning_rate: 3e-4
         weight_decay: 1e-1
         betas:
           - 0.9
           - 0.95
+        # lr schedular
+        warmup_iters: 500
+        lr_decay_iters: 2_000
         epochs: 1
         tqdm_update_interval: 1
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_large.pth.tar
@@ -61,11 +65,15 @@ model:
         dropout: 0.2
         weight_tying: true
         batch_size: 64
+        # optimizer
         learning_rate: 1e-3
         weight_decay: 1e-1
         betas:
           - 0.9
           - 0.95
+        # lr schedular
+        warmup_iters: 500
+        lr_decay_iters: 2_000
         epochs: 1
         tqdm_update_interval: 1
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
@@ -81,11 +89,15 @@ model:
         dropout: 0.0
         weight_tying: true
         batch_size: 12
+        # optimizer
         learning_rate: 1e-3
         weight_decay: 3e-1
         betas:
           - 0.9
           - 0.95
+        # lr schedular
+        warmup_iters: 100
+        lr_decay_iters: 2_000
         epochs: 1
         tqdm_update_interval: 100
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar

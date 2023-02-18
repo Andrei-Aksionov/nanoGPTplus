@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 from torch import Tensor, nn
 
 
@@ -33,19 +31,13 @@ class FeedForward(nn.Module):
         self.scaling = scaling
         self.dropout = dropout
 
-        self.net = nn.Sequential(
-            OrderedDict(
-                [
-                    ("c_fc", nn.Linear(self.embeddings_size, self.scaling * self.embeddings_size, bias=self.bias)),
-                    ("gelu", nn.GELU(approximate="tanh")),
-                    (
-                        "projection",
-                        nn.Linear(self.scaling * self.embeddings_size, self.embeddings_size, bias=self.bias),
-                    ),
-                    ("dropout", nn.Dropout(self.dropout)),
-                ],
-            ),
-        )
+        self.c_fc = nn.Linear(self.embeddings_size, self.scaling * self.embeddings_size, bias=self.bias)
+        self.gelu = nn.GELU(approximate="tanh")
+        self.projection = nn.Linear(self.scaling * self.embeddings_size, self.embeddings_size, bias=self.bias)
+        self.dropout = nn.Dropout(self.dropout)
 
     def forward(self, x: Tensor) -> Tensor:  # noqa: D102
-        return self.net(x)
+        x = self.c_fc(x)
+        x = self.gelu(x)
+        x = self.dropout(x)
+        return self.projection(x)
