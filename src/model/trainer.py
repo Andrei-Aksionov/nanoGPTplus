@@ -128,21 +128,21 @@ class Trainer:
             ):
                 # set model into train or eval mode: required for BatchNorm or Dropout
                 self.model.train() if mode == "train" else self.model.eval()
-                loop = tqdm(dataloader, desc=mode, ascii=True)
+                tqdm_loop = tqdm(dataloader, desc=mode, ascii=True)
                 epoch_loss = torch.tensor(0.0, device=self.device)  # to store accumulated loss during an epoch
                 # iterate over batches
-                for idx, batch in enumerate(loop, start=1):
+                for idx, batch in enumerate(tqdm_loop, start=1):
                     loss = self._train_step(mode, idx, batch)
                     # do not add `epoch_loss` into the computational graph
                     with torch.no_grad():
                         epoch_loss += loss
                     # update loss value in the tqdm output every `n` batches, so it's not updated too frequently
                     if idx % self.tqdm_update_interval == 0:
-                        loop.set_postfix(loss=epoch_loss.item() / idx)
+                        tqdm_loop.set_postfix(loss=epoch_loss.item() / idx)
 
                 # save best performing model (epoch with the smallest eval loss)
                 if mode == "eval":
-                    eval_loss = epoch_loss.item() / len(self.eval_dataloader)
+                    eval_loss = epoch_loss.item() / len(dataloader)
                     tqdm.write(f"Eval averaged loss: {eval_loss:.4f}")
                     if eval_loss < best_eval_loss:
                         logger.info(
