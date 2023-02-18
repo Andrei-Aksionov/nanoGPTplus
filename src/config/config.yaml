@@ -40,16 +40,17 @@ model:
         bias: false # bias in Linear layers and LayerNorms: if true - like in GPT-2, false - a bit better and faster
         dropout: 0.2
         weight_tying: true
-        batch_size: 16
+        batch_size: 8
         # optimizer
         learning_rate: 3e-4
         weight_decay: 1e-1
         betas:
           - 0.9
-          - 0.95
+          - 0.99
         # lr schedular
-        warmup_iters: 500
-        lr_decay_iters: 2_000
+        warmup_iters: null
+        lr_decay_iters: null
+        grad_accumulation_steps: 5
         epochs: 1
         tqdm_update_interval: 1
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_large.pth.tar
@@ -70,10 +71,11 @@ model:
         weight_decay: 1e-1
         betas:
           - 0.9
-          - 0.95
+          - 0.99
         # lr schedular
-        warmup_iters: 500
-        lr_decay_iters: 2_000
+        warmup_iters: null
+        lr_decay_iters: null
+        grad_accumulation_steps: null
         epochs: 1
         tqdm_update_interval: 1
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
@@ -90,15 +92,16 @@ model:
         weight_tying: true
         batch_size: 12
         # optimizer
-        learning_rate: 1e-3
-        weight_decay: 3e-1
+        learning_rate: 3e-4
+        weight_decay: 1e-1
         betas:
           - 0.9
           - 0.95
         # lr schedular
-        warmup_iters: 100
-        lr_decay_iters: 2_000
+        warmup_iters: null
+        lr_decay_iters: null
+        grad_accumulation_steps: null
         epochs: 1
-        tqdm_update_interval: 100
+        tqdm_update_interval: 10
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
         tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_small.pkl

@@ -17,6 +17,7 @@ class Trainer:
         device: None | str | torch.device,
         lr_schedular: None | torch.optim.lr_scheduler.Optimizer = None,
         loss: "torch.nn.modules" = None,
+        grad_accumulation_steps: None | int = None,
         clip_grad_norm: None | float = 1.0,
         checkpoint_model_path: str = "models/model.pth.tar",
         tqdm_update_interval: int = 100,
@@ -40,6 +41,8 @@ class Trainer:
             learning rate schedular, by default None
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
+        grad_accumulation_steps: None | int
+            if provided gradients will be zeroed every n steps
         clip_grad_norm: None | float
             clips gradient norm of an iterable of parameters. The norm is computed over all gradients together, as if
             they were concatenated into a single vector. Gradients are modified in-place, by default 1.0
@@ -73,6 +76,7 @@ class Trainer:
             self.loss = self.model.loss
         else:
             raise ValueError("Loss is not provided and model instance doesn't have such method")
+        self.grad_accumulation_steps = grad_accumulation_steps
         self.clip_grad_norm = clip_grad_norm
         self.tqdm_update_interval = tqdm_update_interval
         self.checkpoint_model_path = checkpoint_model_path
@@ -100,8 +104,8 @@ class Trainer:
             self.optimizer.step()
             if self.lr_schedular:
                 self.lr_schedular.step(idx)
-            self.optimizer.zero_grad(set_to_none=True)
-
+            if not self.grad_accumulation_steps or idx % self.grad_accumulation_step == 0:
+                self.optimizer.zero_grad(set_to_none=True)
         return loss
 
     def train(self, epochs: int) -> None:
