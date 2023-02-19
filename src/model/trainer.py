@@ -101,10 +101,11 @@ class Trainer:
             loss.backward()
             if self.clip_grad_norm:
                 nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_grad_norm)
-            self.optimizer.step()
-            if self.lr_schedular:
-                self.lr_schedular.step(idx)
-            if not self.grad_accumulation_steps or idx % self.grad_accumulation_step == 0:
+            # do weight update only every n grad accumulation steps if provided or every step if not
+            if not self.grad_accumulation_steps or idx % self.grad_accumulation_steps == 0:
+                self.optimizer.step()
+                if self.lr_schedular:
+                    self.lr_schedular.step(idx)
                 self.optimizer.zero_grad(set_to_none=True)
         return loss
 
