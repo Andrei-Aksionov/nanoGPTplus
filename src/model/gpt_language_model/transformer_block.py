@@ -30,7 +30,7 @@ class TransformerBlock(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: int | None,
+        head_size: None | int,
         num_heads: int,
         bias: bool,
         dropout: float,
@@ -52,7 +52,7 @@ class TransformerBlock(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : int | None
+        head_size : None | int
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without residual

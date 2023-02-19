@@ -6,10 +6,17 @@ from loguru import logger
 from src import config
 from src.model import BigramLanguageModel, GPTLanguageModel
 from src.utils import get_device, grab_arguments
+from src.utils.arguments import RangeChecker
 from src.utils.model import get_model_config, load_checkpoint, pickle_load
 
 
-def generate_new_tokens(model_class: torch.nn.Module, device: str | None, size: str, max_new_tokens: int) -> None:
+def generate_new_tokens(
+    model_class: torch.nn.Module,
+    device: str | None,
+    size: str,
+    max_new_tokens: int,
+    temperature: float,
+) -> None:
     """Generate new tokens with help of pre-trained model.
 
     Parameters
@@ -24,6 +31,8 @@ def generate_new_tokens(model_class: torch.nn.Module, device: str | None, size: 
         that is specified in the config file
     max_new_tokens : int
         how many tokens to generate
+    temperature: float
+        temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness
     """
     # get device and model's config
     device = device or get_device()
@@ -39,7 +48,15 @@ def generate_new_tokens(model_class: torch.nn.Module, device: str | None, size: 
     logger.debug("Generating tokens on '{}' device".format(device))
     tokens = tokenizer.encode(" ")
     context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
-    new_tokens = tokenizer.decode(model.generate(context, max_new_tokens=max_new_tokens).squeeze().tolist())
+    new_tokens = tokenizer.decode(
+        model.generate(
+            context,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+        )
+        .squeeze()
+        .tolist(),
+    )
     logger.info("New generated tokens: {}".format(new_tokens))
 
 
@@ -74,8 +91,17 @@ def main() -> None:
         required=False,
         type=int,
     )
-    args = parser.parse_args()
-    generate_new_tokens(models[args.model], args.device, args.size, args.max_new_tokens)
+    parser.add_argument(
+        "--temperature",
+        default=1.0,
+        choices=RangeChecker(0, float("inf"), inclusive_start=False),
+        help="Temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness",
+        required=False,
+        type=float,
+    )
+    args = vars(parser.parse_args())
+    model_name = models[args.pop("model")]
+    generate_new_tokens(model_name, **args)
 
 
 if __name__ == "__main__":

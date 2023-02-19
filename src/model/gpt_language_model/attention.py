@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
@@ -283,9 +285,9 @@ class CausalSelfAttention(nn.Module):
         self.is_decoder = is_decoder
 
         # key, query and value projections (hence `3 * ...`) for all heads in a single batch
-        self.causal_self_attention = nn.Linear(embeddings_size, 3 * self.head_size * self.num_heads, bias=bias)
+        self.causal_self_attention = nn.Linear(embeddings_size, 3 * self.head_size * self.num_heads, bias=self.bias)
         # output projection
-        self.projection = nn.Linear(self.head_size * self.num_heads, embeddings_size, bias=bias)
+        self.projection = nn.Linear(self.head_size * self.num_heads, embeddings_size, bias=self.bias)
         # regularization
         self.attention_dropout = nn.Dropout(self.dropout)
         self.projection_dropout = nn.Dropout(self.dropout)
@@ -340,7 +342,7 @@ class CausalSelfAttention(nn.Module):
         # that will mean that the attention will be on a single (or couple of) tokens, and we want it to be
         # spread out (like [0.2, 0.1, 0.7])
         # we want to aggregate information not from a single node
-        attention_scores *= key.shape[-1] ** -0.5  # (B, nh, T, T)
+        attention_scores *= 1.0 / math.sqrt(key.shape[-1])  # (B, nh, T, T)
 
         # if it's a decoder we need to mask 'future' tokens with '-inf' value
         if self.is_decoder:

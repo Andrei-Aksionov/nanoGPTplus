@@ -1,4 +1,5 @@
 import argparse
+import inspect
 from pathlib import Path
 
 import torch
@@ -8,6 +9,7 @@ from torch.utils.data import DataLoader
 from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
+from src.model.gpt_language_model.optimizers import CosineWarmupLRSchedular
 from src.utils import get_device, grab_arguments, set_seed
 from src.utils.arguments import RangeChecker
 from src.utils.model import get_model_config, pickle_dump
@@ -68,25 +70,61 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
         NextTokenDataset(train_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
         num_workers=config.dataloader.num_workers,
+        shuffle=True,
     )
     test_dataloader = DataLoader(
         NextTokenDataset(test_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
         num_workers=config.dataloader.num_workers,
+        shuffle=False,
     )
     logger.info("Data loaders are prepared.")
 
     # Step 4: Train the model
+    # Step 4.1. Create model
     logger.info("Staring training...")
     model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=model_config.learning_rate)
+    # Step 4.2. Configure optimizer
+    optimizer_parameters = model.optimizer_parameters if hasattr(model, "optimizer_parameters") else model.parameters()
+    # new PyTorch nightly has a new 'fused' option for AdamW that is much faster
+    if device == "cuda" and ("fused" in inspect.signature(torch.optim.AdamW).parameters):
+        logger.debug("Using fused AdamW")
+        extra_args = {"fused": True}
+    else:
+        extra_args = {}
+    optimizer = torch.optim.AdamW(
+        optimizer_parameters,
+        lr=model_config.learning_rate,
+        betas=model_config.betas,
+        **extra_args,
+    )
+    # Step 4.3 Configure LR schedular
+    if "warmup_iters" not in model_config or not model_config.warmup_iters:
+        warmup_iters = int(len(train_dataloader) * 0.1)
+    else:
+        warmup_iters = model_config.warmup_iters
+    logger.debug("Warmup iters: {}".format(warmup_iters))
+    if "lr_decay_iters" not in model_config or not model_config.lr_decay_iters:
+        lr_decay_iters = int(len(train_dataloader) * 0.95)
+    else:
+        lr_decay_iters = model_config.lr_decay_iters
+    logger.debug("LR decay iters: {}".format(lr_decay_iters))
+    lr_schedular = CosineWarmupLRSchedular(
+        optimizer=optimizer,
+        warmup_iters=warmup_iters,
+        lr_decay_iters=lr_decay_iters,
+    )
+    # Step 4.4. Start training
     trainer = Trainer(
-        model,
-        optimizer,
-        train_dataloader,
-        test_dataloader,
+        model=model,
+        optimizer=optimizer,
+        train_dataloader=train_dataloader,
+        eval_dataloader=test_dataloader,
         device=device or get_device(),
+        lr_schedular=lr_schedular,
+        grad_accumulation_steps=model_config.grad_accumulation_steps,
         checkpoint_model_path=model_config.checkpoint_model_path,
+        tqdm_update_interval=model_config.tqdm_update_interval,
     )
     trainer.train(epochs=model_config.epochs)
     logger.info("Training is finished")
@@ -107,7 +145,7 @@ def main() -> None:
     parser.add_argument(
         "--size",
         "-s",
-        choices=["small", "large"],
+        choices=["small", "medium", "large"],
         help="The size of the model (small or large)",
     )
     parser.add_argument(
@@ -123,8 +161,9 @@ def main() -> None:
         required=False,
         type=float,
     )
-    args = parser.parse_args()
-    train(models[args.model], args.device, args.size, args.dataset_fraction)
+    args = vars(parser.parse_args())
+    model_name = models[args.pop("model")]
+    train(model_name, **args)
 
 
 if __name__ == "__main__":
