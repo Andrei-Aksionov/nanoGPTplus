@@ -1,13 +1,15 @@
 <p>
-    <h2 align="center">Welcome to NanoGPT in PyTorch</h2>
-    <h5 align="center">Knock-off edition<h5>
+    <h2 align="center">Welcome to NanoGPT+ in PyTorch</h2>
+    <h5 align="center">Knock-off edition (but with enchantments)<h5>
 </p>
 
 ***
 
-In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY).
+In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY). The original code is in a state that is suitable for rapid prototyping, while the code in this repository in my opinion is more mature (with docstrings, comments of what is exactly going on, readme for architectures, ...) hence the name - nanoGPT+ (you can read it as a very-very small plus :laughing:)
 
 The purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with as few issues as possible).
+
+**Important Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) if you have one then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
 
 <p align=center><img src="references/readme/amazon_prime.jpg"></p>
 
@@ -35,9 +37,10 @@ The purpose of it is to better understand how Transformer architecture works by 
       - *bigram_lm.py*: implementation of simple bigram language model
       - **README.md*: notes about architecture of bigram language model
     - **gpt_language_model**
-      - *attention.py*: single head and multi-head self-attention
-      - *feed_forward.py*: feed-forward layer of transformer block
+      - *attention.py*: single head, multi-head and casual self-attentions
+      - *feed_forward.py*: feed-forward layer (position-wise MLP) of transformer block
       - *gpt.py*: the whole GPT architecture
+      - *optimizers.py*: contain custom optimizers and learning rate schedulers
       - *README.md*: notes about GPT as a whole and attention in particular
       - *transformer_block.py*: building block of GPT including self-attention and feed-forward
     - *generate.py*: code for generating new tokens with help of pre-trained model
