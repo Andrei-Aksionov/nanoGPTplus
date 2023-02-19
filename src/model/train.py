@@ -161,8 +161,9 @@ def main() -> None:
         required=False,
         type=float,
     )
-    args = parser.parse_args()
-    train(models[args.model], args.device, args.size, args.dataset_fraction)
+    args = vars(parser.parse_args())
+    model_name = models[args.pop("model")]
+    train(model_name, **args)
 
 
 if __name__ == "__main__":
