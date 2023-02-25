@@ -15,7 +15,7 @@ class Trainer:
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
         device: None | str | torch.device,
-        lr_schedular: None | torch.optim.lr_scheduler.Optimizer = None,
+        lr_scheduler: None | torch.optim.lr_scheduler.Optimizer = None,
         loss: "torch.nn.modules" = None,
         grad_accumulation_steps: None | int = None,
         clip_grad_norm: None | float = 1.0,
@@ -37,8 +37,8 @@ class Trainer:
         device: None | str | torch.device
             where the model and batch should be stored and executed
             if device is None, batch will be moved to the same device where the model is
-        lr_schedular: None | torch.optim.lr_schedular.Optimizer
-            learning rate schedular, by default None
+        lr_scheduler: None | torch.optim.lr_scheduler.Optimizer
+            learning rate scheduler, by default None
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
         grad_accumulation_steps: None | int
@@ -68,7 +68,7 @@ class Trainer:
             self.model.to(self.device)
         else:
             self.device = next(model.parameters()).device
-        self.lr_schedular = lr_schedular
+        self.lr_scheduler = lr_scheduler
         # either model should contain the loss or the loss function has to be provided
         if loss:
             self.loss = loss
@@ -104,8 +104,8 @@ class Trainer:
             # do weight update only every n grad accumulation steps if provided or every step if not
             if not self.grad_accumulation_steps or idx % self.grad_accumulation_steps == 0:
                 self.optimizer.step()
-                if self.lr_schedular:
-                    self.lr_schedular.step(idx)
+                if self.lr_scheduler:
+                    self.lr_scheduler.step(idx)
                 self.optimizer.zero_grad(set_to_none=True)
         return loss
 

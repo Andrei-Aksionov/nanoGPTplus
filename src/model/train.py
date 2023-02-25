@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
-from src.model.gpt_language_model.optimizers import CosineWarmupLRSchedular
+from src.model.lr_schedulers import CosineWarmupLRScheduler
 from src.utils import get_device, grab_arguments, set_seed
 from src.utils.arguments import RangeChecker
 from src.utils.model import get_model_config, pickle_dump
@@ -109,7 +109,7 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
     else:
         lr_decay_iters = model_config.lr_decay_iters
     logger.debug("LR decay iters: {}".format(lr_decay_iters))
-    lr_schedular = CosineWarmupLRSchedular(
+    lr_scheduler = CosineWarmupLRScheduler(
         optimizer=optimizer,
         warmup_iters=warmup_iters,
         lr_decay_iters=lr_decay_iters,
@@ -121,7 +121,7 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
         train_dataloader=train_dataloader,
         eval_dataloader=test_dataloader,
         device=device or get_device(),
-        lr_schedular=lr_schedular,
+        lr_scheduler=lr_scheduler,
         grad_accumulation_steps=model_config.grad_accumulation_steps,
         checkpoint_model_path=model_config.checkpoint_model_path,
         tqdm_update_interval=model_config.tqdm_update_interval,
