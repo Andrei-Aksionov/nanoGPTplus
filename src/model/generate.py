@@ -1,4 +1,5 @@
 import argparse
+from time import perf_counter
 
 import torch
 from loguru import logger
@@ -8,6 +9,7 @@ from src.model import BigramLanguageModel, GPTLanguageModel
 from src.utils import get_device, grab_arguments
 from src.utils.arguments import RangeChecker
 from src.utils.model import get_model_config, load_checkpoint, pickle_load
+from src.utils.seed import set_seed
 
 
 def generate_new_tokens(
@@ -16,6 +18,7 @@ def generate_new_tokens(
     size: str,
     max_new_tokens: int,
     temperature: float,
+    fix_seed: bool,
 ) -> None:
     """Generate new tokens with help of pre-trained model.
 
@@ -33,7 +36,12 @@ def generate_new_tokens(
         how many tokens to generate
     temperature: float
         temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness
+    fix_seed: bool
+        might be useful for debugging to have the same output every time, if so, then set fix_seed=True
     """
+    if fix_seed:
+        set_seed(config.seed)
+        logger.debug("Fixed seed for token generation.")
     # get device and model's config
     device = device or get_device()
     model_config = get_model_config(model_class, config, size)
@@ -45,6 +53,7 @@ def generate_new_tokens(
     model.to(device)
 
     # generate tokens
+    start = perf_counter()
     logger.debug("Generating tokens on '{}' device".format(device))
     tokens = tokenizer.encode(" ")
     context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
@@ -58,6 +67,7 @@ def generate_new_tokens(
         .tolist(),
     )
     logger.info("New generated tokens: {}".format(new_tokens))
+    logger.debug("Token generation took: {:.4f} seconds".format(perf_counter() - start))
 
 
 def main() -> None:
@@ -98,6 +108,12 @@ def main() -> None:
         help="Temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness",
         required=False,
         type=float,
+    )
+    parser.add_argument(
+        "--fix-seed",
+        help="Make token generation deterministic",
+        action="store_true",
+        required=False,
     )
     args = vars(parser.parse_args())
     model_name = models[args.pop("model")]

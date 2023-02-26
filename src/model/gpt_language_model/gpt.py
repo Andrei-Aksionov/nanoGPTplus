@@ -76,8 +76,24 @@ class GPTLanguageModel(nn.Module):
         # positional embeddings knows how to encode position of last N (context_size) tokens
         self.positional_embedding_table = nn.Embedding(self.context_size, self.embeddings_size)
         self.embeddings_dropout = nn.Dropout(self.dropout)
-        self.transformer_blocks = nn.Sequential(
-            *[
+        # self.transformer_blocks = nn.Sequential(
+        #     *[
+        #         TransformerBlock(
+        #             embeddings_size=self.embeddings_size,
+        #             context_size=self.context_size,
+        #             head_size=self.head_size,
+        #             num_heads=self.num_heads,
+        #             bias=self.bias,
+        #             dropout=self.dropout,
+        #             feed_forward_scaling=self.feed_forward_scaling,
+        #             is_decoder=True,
+        #             use_causal_self_attention=True,
+        #         )
+        #         for _ in range(self.num_layers)
+        #     ],
+        # )
+        self.transformer_blocks = nn.ModuleList(
+            [
                 TransformerBlock(
                     embeddings_size=self.embeddings_size,
                     context_size=self.context_size,
@@ -140,6 +156,71 @@ class GPTLanguageModel(nn.Module):
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
 
+    def forward(self, idx: Tensor, *, inference: bool = False, past=None, pos_id=None) -> Tensor:
+        """Do the whole forward pass for decoder part of transformer.
+
+        This forward method includes all steps for decoder:
+        1. token embeddings + positional
+        2. transformer block consisting of self-attention, feed-forward, addNorm
+        3. logits for each token in vocabulary (or the last one in case of inference)
+
+        Parameters
+        ----------
+        idx : Tensor
+            tensor of size (batch, time-step) consisting of indices of tokens inside vocabulary
+            for each time-step for each batch
+        inference: bool
+            during inference we don't care about all tokens but the very last one, so we can
+            apply final language head only on the last token and save some computations
+
+        Raises
+        ------
+        ValueError
+            if there is a mismatch between number of time-steps and self.context_size
+
+        Returns
+        -------
+        Tensor
+            tensor of size (batch, time-step, vocabulary_size): logits for each token in vocabulary
+            for each time-step for each batch, or the last one in case of inference
+        """
+        # batch, time-step
+        B, T = idx.shape  # noqa: N806
+        if self.context_size < T:
+            msg = f"Cannot do forward pass on sequence of length {T}, "
+            f"context size should less or equal to {self.context_size}"
+            raise ValueError(msg)
+
+        # obtain token embeddings and add positional information
+        token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
+        if pos_id is not None:
+            positional_embeddings = self.positional_embedding_table.weight[None, pos_id]
+        else:
+            positional_embeddings = self.positional_embedding_table.weight[:T]  # (T, C)
+        x = token_embeddings + positional_embeddings  # (B, T, C)
+        x = self.embeddings_dropout(x)  # (B, T, C)
+
+        # apply multiple transformer blocks
+        # x = self.transformer_blocks(x)  # (B, T, C)
+        # for block in self.transformer_blocks:
+        #     x, _ = block(x, None)
+        presents = []
+        past = past or [None] * self.num_layers
+        for block, past_layer in zip(self.transformer_blocks, past):
+            x, present = block(x, past_layer)
+            presents.append(present)
+        # apply final normalization and generate logits for each token in vocabulary
+        x = self.layer_norm(x)  # (B, T, C)
+
+        # during inference we don't need to encode all token predictions,
+        # only the last one (newly generated)
+        # assert not (inference and past), "either inference optimizations or kv-cache"
+        if inference:
+            # return self.language_model_head(x[:, -1:, :])  # (B, 1, vocab_size)
+            return self.language_model_head(x)
+        # return self.language_model_head(x)  # (B, T, vocab_size)
+        return self.language_model_head(x), presents
+
     def __optimizer_parameters(self, weight_decay: float) -> list[dict, dict]:
         """Configure optimizer with weight decay for nn.Linear.
 
@@ -179,58 +260,6 @@ class GPTLanguageModel(nn.Module):
             {"params": [param_dict[pn] for pn in sorted(decay)], "weight_decay": weight_decay},
             {"params": [param_dict[pn] for pn in sorted(no_decay)], "weight_decay": 0.0},
         ]
-
-    def forward(self, idx: Tensor, *, inference: bool = False) -> Tensor:
-        """Do the whole forward pass for decoder part of transformer.
-
-        This forward method includes all steps for decoder:
-        1. token embeddings + positional
-        2. transformer block consisting of self-attention, feed-forward, addNorm
-        3. logits for each token in vocabulary (or the last one in case of inference)
-
-        Parameters
-        ----------
-        idx : Tensor
-            tensor of size (batch, time-step) consisting of indices of tokens inside vocabulary
-            for each time-step for each batch
-        inference: bool
-            during inference we don't care about all tokens but the very last one, so we can
-            apply final language head only on the last token and save some computations
-
-        Raises
-        ------
-        ValueError
-            if there is a mismatch between number of time-steps and self.context_size
-
-        Returns
-        -------
-        Tensor
-            tensor of size (batch, time-step, vocabulary_size): logits for each token in vocabulary
-            for each time-step for each batch, or the last one in case of inference
-        """
-        # batch, time-step
-        B, T = idx.shape  # noqa: N806
-        if self.context_size < T:
-            msg = f"Cannot do forward pass on sequence of length {T}, "
-            f"context size should less or equal to {self.context_size}"
-            raise ValueError(msg)
-
-        # obtain token embeddings and add positional information
-        token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        positional_embeddings = self.positional_embedding_table.weight[:T]  # (T, C)
-        x = token_embeddings + positional_embeddings  # (B, T, C)
-        x = self.embeddings_dropout(x)  # (B, T, C)
-
-        # apply multiple transformer blocks
-        x = self.transformer_blocks(x)  # (B, T, C)
-        # apply final normalization and generate logits for each token in vocabulary
-        x = self.layer_norm(x)  # (B, T, C)
-
-        # during inference we don't need to encode all token predictions,
-        # only the last one (newly generated)
-        if inference:
-            return self.language_model_head(x[:, -1:, :])  # (B, 1, vocab_size)
-        return self.language_model_head(x)  # (B, T, vocab_size)
 
     def loss(self, logits: Tensor, targets: Tensor) -> Tensor:
         """Prepare tensors to be compatible with Pytorch's Cross-Entropy loss and applies it.
@@ -310,4 +339,36 @@ class GPTLanguageModel(nn.Module):
             idx_next = torch.multinomial(probs, num_samples=1)  # (B, 1)
             # append sampled index to the running sequence
             idx = torch.cat((idx, idx_next), dim=1)  # (B, T + 1)
+
+        print(idx)
+        return idx
+
+    @torch.no_grad()
+    def generate1(
+        self,
+        idx: Tensor,
+        max_new_tokens: int,
+        temperature: float = 1.0,
+        top_k_logits: None | int = None,
+        past=None,
+    ) -> Tensor:
+        # past: (2, B, nh, T, hs)
+        idx_next = idx
+        for i_loop in range(max_new_tokens):
+            if past is not None and i_loop >= self.context_size:
+                past = [t[:, :, :, -self.context_size :, :].clone().detach() for t in past]
+            logits, past = self(idx_next, past=past, pos_id=i_loop)
+            logits = logits[:, -1, :] / temperature
+            if top_k_logits:
+                # topk returns rearranged tensor where the first column contains the highest values,
+                # the last column - the smallest values from top K logits ...
+                values, _ = torch.topk(logits, min(top_k_logits, logits.shape[-1]))
+                # ... that's why we need to compare with the last column
+                logits[logits < values[:, -1]] = float("-inf")  # `-1:` is to preserve dimensionality
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1)
+            idx = torch.cat((idx, idx_next), dim=1)
+
+        print(idx)
+
         return idx

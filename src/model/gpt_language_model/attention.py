@@ -295,7 +295,7 @@ class CausalSelfAttention(nn.Module):
         if self.is_decoder:
             self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, past=None) -> Tensor:
         """Do multi-head attention in a single pass.
 
         Multiply by weight matrix -> split the result into query, key and value -> reshape each one of them
@@ -332,6 +332,13 @@ class CausalSelfAttention(nn.Module):
         query = query.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
         value = value.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
 
+        if past is not None:
+            past_key, past_value = past.unbind(dim=0)
+            key = torch.cat((past_key, key), dim=-2)
+            value = torch.cat((past_value, value), dim=-2)
+
+        present = torch.stack((key, value))  # (2, B, nh, T, hs)
+
         # to obtain attention scores first do dot product of query and key
         attention_scores = query @ key.mT  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
 
@@ -342,7 +349,10 @@ class CausalSelfAttention(nn.Module):
         # that will mean that the attention will be on a single (or couple of) tokens, and we want it to be
         # spread out (like [0.2, 0.1, 0.7])
         # we want to aggregate information not from a single node
-        attention_scores *= 1.0 / math.sqrt(key.shape[-1])  # (B, nh, T, T)
+        # TODO: simplification
+        # attention_scores /= math.sqrt(key.shape[-1])
+        # attention_scores *= 1.0 / math.sqrt(key.shape[-1])  # (B, nh, T, T)
+        attention_scores *= 1.0 / math.sqrt(query.shape[-1])  # (B, nh, T, T)
 
         # if it's a decoder we need to mask 'future' tokens with '-inf' value
         if self.is_decoder:
@@ -367,4 +377,5 @@ class CausalSelfAttention(nn.Module):
         output = output.transpose(1, 2).reshape(B, T, self.head_size * self.num_heads)  # (B, T, hs * nh)
         # output projection
         output = self.projection(output)  # (B, T, C)
-        return self.projection_dropout(output)  # (B, T, C)
+        # return self.projection_dropout(output)  # (B, T, C)
+        return self.projection_dropout(output), present
