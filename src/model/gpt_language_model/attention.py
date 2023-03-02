@@ -55,7 +55,7 @@ class SelfAttentionHead(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, past=None, return_present=False) -> Tensor:
         """Forward method for Self-Attention.
 
         Self-attention does these 6 steps:
@@ -89,6 +89,11 @@ class SelfAttentionHead(nn.Module):
         query = self.query_weights(x)  # (B, T, head_size)
         value = self.value_weights(x)  # (B, T, head_size)
 
+        if past is not None:
+            past_key, past_value = past.unbind(dim=0)
+            key = torch.cat((past_key, key), dim=-2)
+            value = torch.cat((past_value, value), dim=-2)
+
         # first to obtaining attention scores: dot product of key and query
         attention_scores = query @ key.mT  # (B, T, head_size) @ (B, head_size, T) -> (B, T, T)
 
@@ -99,8 +104,7 @@ class SelfAttentionHead(nn.Module):
         # that will mean that the attention will be on a single (or couple of) tokens, and we want it to be
         # spread out (like [0.2, 0.1, 0.7])
         # we want to aggregate information not from a single node
-        head_size = key.shape[-1]
-        attention_scores *= head_size**-0.5
+        attention_scores /= math.sqrt(key.shape[-1])
 
         # if it's a decoder we need to mask 'future' tokens with '-inf' value
         if self.is_decoder:
@@ -120,7 +124,11 @@ class SelfAttentionHead(nn.Module):
         attention_scores = self.dropout(attention_scores)
 
         # perform the weighted aggregation of the values
-        return attention_scores @ value  # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
+        # return attention_scores @ value  # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
+        return (
+            attention_scores @ value,
+            torch.stack((key, value)) if return_present else None,  # None | (2, B, T, head_size)
+        )
 
 
 class MultiHeadAttention(nn.Module):
@@ -203,7 +211,7 @@ class MultiHeadAttention(nn.Module):
         self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size, bias=self.bias)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, past=None, return_present=False) -> Tensor:
         """Apply multiple self-attention heads in parallel and concatenate the result.
 
         Parameters
@@ -217,12 +225,40 @@ class MultiHeadAttention(nn.Module):
             output vector of the same size as input
         """
         # concatenate over channel dimension
-        out = torch.cat(
-            [head(x) for head in self.heads],
-            dim=-1,
-        )  # num_heads * (B, T, head_size) -> (B, T, head_size * num_heads)
-        out = self.projection(out)  # (B, T, embeddings_size)
-        return self.dropout(out)  # (B, T, embeddings_size)
+        # out = torch.cat(
+        #     [head(x) for head in self.heads],
+        #     dim=-1,
+        # )  # num_heads * (B, T, head_size) -> (B, T, head_size * num_heads)
+        # out = self.projection(out)  # (B, T, embeddings_size)
+        # return self.dropout(out)  # (B, T, embeddings_size)
+
+        if past is None:
+            past = [None] * self.num_heads
+        else:
+            past = past.unbind(2)  # (2, B, nh, T, hs) -> nh * (2, B, T, hs)
+
+        presents = []
+        outputs = []
+        for head, past_layer in zip(self.heads, past):
+            # present: None | (2, B, T, head_size)
+            out, present = head(x, past_layer, return_present)
+            outputs.append(out)
+            if present is not None:
+                presents.append(present)
+
+        out = torch.cat(outputs, dim=-1)
+        out = self.projection(out)
+        out = self.dropout(out)
+
+        # if all(x is None for x in presents):
+        if not presents:
+            return out, None
+
+        # Expected: None | # (2, B, nh, T, hs)
+        presents = torch.stack(presents, dim=-2)  # nh * (2, B, T, hs) -> (2, B, T, nh, hs)
+        presents = presents.transpose(2, 3)  # (2, B, nh, T, hs)
+
+        return out, presents
 
 
 class CausalSelfAttention(nn.Module):
@@ -295,7 +331,7 @@ class CausalSelfAttention(nn.Module):
         if self.is_decoder:
             self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
-    def forward(self, x: Tensor, past=None) -> Tensor:
+    def forward(self, x: Tensor, past=None, return_present=False) -> Tensor:
         """Do multi-head attention in a single pass.
 
         Multiply by weight matrix -> split the result into query, key and value -> reshape each one of them
@@ -337,8 +373,6 @@ class CausalSelfAttention(nn.Module):
             key = torch.cat((past_key, key), dim=-2)
             value = torch.cat((past_value, value), dim=-2)
 
-        present = torch.stack((key, value))  # (2, B, nh, T, hs)
-
         # to obtain attention scores first do dot product of query and key
         attention_scores = query @ key.mT  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
 
@@ -349,10 +383,7 @@ class CausalSelfAttention(nn.Module):
         # that will mean that the attention will be on a single (or couple of) tokens, and we want it to be
         # spread out (like [0.2, 0.1, 0.7])
         # we want to aggregate information not from a single node
-        # TODO: simplification
-        # attention_scores /= math.sqrt(key.shape[-1])
-        # attention_scores *= 1.0 / math.sqrt(key.shape[-1])  # (B, nh, T, T)
-        attention_scores *= 1.0 / math.sqrt(query.shape[-1])  # (B, nh, T, T)
+        attention_scores /= math.sqrt(key.shape[-1])  # (B, nh, T, T)
 
         # if it's a decoder we need to mask 'future' tokens with '-inf' value
         if self.is_decoder:
@@ -377,5 +408,7 @@ class CausalSelfAttention(nn.Module):
         output = output.transpose(1, 2).reshape(B, T, self.head_size * self.num_heads)  # (B, T, hs * nh)
         # output projection
         output = self.projection(output)  # (B, T, C)
-        # return self.projection_dropout(output)  # (B, T, C)
-        return self.projection_dropout(output), present
+        return (
+            self.projection_dropout(output),  # (B, T, C)
+            torch.stack((key, value)) if return_present else None,  # None | # (2, B, nh, T, hs)
+        )

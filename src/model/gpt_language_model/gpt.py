@@ -76,22 +76,6 @@ class GPTLanguageModel(nn.Module):
         # positional embeddings knows how to encode position of last N (context_size) tokens
         self.positional_embedding_table = nn.Embedding(self.context_size, self.embeddings_size)
         self.embeddings_dropout = nn.Dropout(self.dropout)
-        # self.transformer_blocks = nn.Sequential(
-        #     *[
-        #         TransformerBlock(
-        #             embeddings_size=self.embeddings_size,
-        #             context_size=self.context_size,
-        #             head_size=self.head_size,
-        #             num_heads=self.num_heads,
-        #             bias=self.bias,
-        #             dropout=self.dropout,
-        #             feed_forward_scaling=self.feed_forward_scaling,
-        #             is_decoder=True,
-        #             use_causal_self_attention=True,
-        #         )
-        #         for _ in range(self.num_layers)
-        #     ],
-        # )
         self.transformer_blocks = nn.ModuleList(
             [
                 TransformerBlock(
@@ -156,7 +140,7 @@ class GPTLanguageModel(nn.Module):
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
 
-    def forward(self, idx: Tensor, *, inference: bool = False, past=None, pos_id=None) -> Tensor:
+    def forward(self, idx: Tensor, *, inference: bool = False, past=None, return_present=False) -> Tensor:
         """Do the whole forward pass for decoder part of transformer.
 
         This forward method includes all steps for decoder:
@@ -193,21 +177,18 @@ class GPTLanguageModel(nn.Module):
 
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        if pos_id is not None:
-            positional_embeddings = self.positional_embedding_table.weight[None, pos_id]
+        if past is not None:
+            positional_embeddings = self.positional_embedding_table.weight[None, past[0].shape[-2]]
         else:
             positional_embeddings = self.positional_embedding_table.weight[:T]  # (T, C)
         x = token_embeddings + positional_embeddings  # (B, T, C)
         x = self.embeddings_dropout(x)  # (B, T, C)
 
         # apply multiple transformer blocks
-        # x = self.transformer_blocks(x)  # (B, T, C)
-        # for block in self.transformer_blocks:
-        #     x, _ = block(x, None)
         presents = []
         past = past or [None] * self.num_layers
         for block, past_layer in zip(self.transformer_blocks, past):
-            x, present = block(x, past_layer)
+            x, present = block(x, past_layer, return_present=return_present)
             presents.append(present)
         # apply final normalization and generate logits for each token in vocabulary
         x = self.layer_norm(x)  # (B, T, C)
@@ -216,10 +197,13 @@ class GPTLanguageModel(nn.Module):
         # only the last one (newly generated)
         # assert not (inference and past), "either inference optimizations or kv-cache"
         if inference:
-            # return self.language_model_head(x[:, -1:, :])  # (B, 1, vocab_size)
-            return self.language_model_head(x)
-        # return self.language_model_head(x)  # (B, T, vocab_size)
-        return self.language_model_head(x), presents
+            return (
+                # TODO: figure out why this doesn't work
+                # self.language_model_head(x[:, -1, :]),  # (B, 1, vocab_size)
+                self.language_model_head(x),
+                presents,  # num_layers * (2, B, num_heads, T, head_size)
+            )
+        return self.language_model_head(x)  # (B, T, vocab_size)
 
     def __optimizer_parameters(self, weight_decay: float) -> list[dict, dict]:
         """Configure optimizer with weight decay for nn.Linear.
@@ -291,6 +275,7 @@ class GPTLanguageModel(nn.Module):
         self,
         idx: Tensor,
         max_new_tokens: int,
+        use_kv_cache: bool,
         temperature: float = 1.0,
         top_k_logits: None | int = None,
     ) -> Tensor:
@@ -302,6 +287,9 @@ class GPTLanguageModel(nn.Module):
             index of the current character
         max_new_tokens : int
             number of characters to be generated
+        use_kv_cache: bool
+            use key-value cache for speed up token generation; if true the number of generated tokens
+            should not be larger than context size of the model
         temperature : float, optional
             The temperature determines how greedy the generative model is:
             If the temperature is low, the probabilities to sample other but the class with the highest log probability
@@ -318,13 +306,30 @@ class GPTLanguageModel(nn.Module):
         -------
         Tensor
             tensor containing indices of the provided characters and newly generated
+
+        Raises
+        ------
+        ValueError
+            if using key-value cache and the number of tokens to generate is larger that context size of the model
         """
-        # idx is (B, T) array of indices in the current context
+        if use_kv_cache and max_new_tokens > self.context_size:
+            raise ValueError(
+                "With kv-cache number of new tokens should not be greater than context size with which model was trained, "
+                f"but was requested '{max_new_tokens}' new tokens with '{self.context_size}' context size",
+            )
+        past = None  # None | (2, B, nh, T, hs)
         for _ in range(max_new_tokens):
-            # crop idx to the last block_size items
-            context = idx[:, -self.context_size :]
+            if use_kv_cache:
+                # use only the last token with kv-cache
+                context = idx[:, -1:]
+            else:
+                # crop idx to the last block_size items
+                context = idx[:, -self.context_size :]
+                past = None
             # get the predictions
-            logits = self(context, inference=True)  # (B, T, C), with inference=True -> (1, 1, C)
+            logits, past = self(
+                context, past=past, inference=True, return_present=use_kv_cache
+            )  # (B, T, C), with inference=True -> (1, 1, C)
             # focus only on the last time step and scale by desired temperature
             logits = logits[:, -1, :] / temperature  # becomes (B, C)
             if top_k_logits:
@@ -339,35 +344,6 @@ class GPTLanguageModel(nn.Module):
             idx_next = torch.multinomial(probs, num_samples=1)  # (B, 1)
             # append sampled index to the running sequence
             idx = torch.cat((idx, idx_next), dim=1)  # (B, T + 1)
-
-        print(idx)
-        return idx
-
-    @torch.no_grad()
-    def generate1(
-        self,
-        idx: Tensor,
-        max_new_tokens: int,
-        temperature: float = 1.0,
-        top_k_logits: None | int = None,
-        past=None,
-    ) -> Tensor:
-        # past: (2, B, nh, T, hs)
-        idx_next = idx
-        for i_loop in range(max_new_tokens):
-            if past is not None and i_loop >= self.context_size:
-                past = [t[:, :, :, -self.context_size :, :].clone().detach() for t in past]
-            logits, past = self(idx_next, past=past, pos_id=i_loop)
-            logits = logits[:, -1, :] / temperature
-            if top_k_logits:
-                # topk returns rearranged tensor where the first column contains the highest values,
-                # the last column - the smallest values from top K logits ...
-                values, _ = torch.topk(logits, min(top_k_logits, logits.shape[-1]))
-                # ... that's why we need to compare with the last column
-                logits[logits < values[:, -1]] = float("-inf")  # `-1:` is to preserve dimensionality
-            probs = F.softmax(logits, dim=-1)
-            idx_next = torch.multinomial(probs, num_samples=1)
-            idx = torch.cat((idx, idx_next), dim=1)
 
         print(idx)
 

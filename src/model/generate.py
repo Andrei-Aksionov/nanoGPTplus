@@ -17,6 +17,7 @@ def generate_new_tokens(
     device: str | None,
     size: str,
     max_new_tokens: int,
+    use_kv_cache: bool,
     temperature: float,
     fix_seed: bool,
 ) -> None:
@@ -34,6 +35,8 @@ def generate_new_tokens(
         that is specified in the config file
     max_new_tokens : int
         how many tokens to generate
+    use_kv_cache: bool
+        for speed up key-value cache can be use; should not be greater than context size with which model was trained
     temperature: float
         temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness
     fix_seed: bool
@@ -62,6 +65,7 @@ def generate_new_tokens(
             context,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
+            use_kv_cache=use_kv_cache,
         )
         .squeeze()
         .tolist(),
@@ -100,6 +104,12 @@ def main() -> None:
         help="How many new tokens do you want to generate",
         required=False,
         type=int,
+    )
+    parser.add_argument(
+        "--use-kv-cache",
+        help="Use ke-value cache for speed up token generation",
+        action="store_true",
+        required=False,
     )
     parser.add_argument(
         "--temperature",
