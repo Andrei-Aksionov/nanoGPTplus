@@ -55,7 +55,7 @@ class SelfAttentionHead(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor, past=None, return_present=False) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
         """Forward method for Self-Attention.
 
         Self-attention does these 6 steps:
@@ -76,6 +76,9 @@ class SelfAttentionHead(nn.Module):
         ----------
         x : Tensor
             input tensor containing vector representation of x
+        kv_cache: None | Tensor
+            key-value cache, but only if not None; if None - it means that it's disabled
+            contains cache for keys and value from all previous steps
 
         Returns
         -------
@@ -89,10 +92,10 @@ class SelfAttentionHead(nn.Module):
         query = self.query_weights(x)  # (B, T, head_size)
         value = self.value_weights(x)  # (B, T, head_size)
 
-        if past is not None:
-            past_key, past_value = past.unbind(dim=0)
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
+        if kv_cache is not None:
+            key_cached, value_cached = kv_cache.unbind(dim=0)  # (2, B, T, head_size) -> 2 * (B, T, head_size)
+            key = torch.cat((key_cached, key), dim=-2)  # (B, cache + T, head_size)
+            value = torch.cat((value_cached, value), dim=-2)  # (B, cache + T, head_size)
 
         # first to obtaining attention scores: dot product of key and query
         attention_scores = query @ key.mT  # (B, T, head_size) @ (B, head_size, T) -> (B, T, T)
@@ -123,11 +126,10 @@ class SelfAttentionHead(nn.Module):
         # helps prevent overfitting
         attention_scores = self.dropout(attention_scores)
 
-        # perform the weighted aggregation of the values
-        # return attention_scores @ value  # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
+        # return the weighted aggregation of the values and kv-cache if needed
         return (
-            attention_scores @ value,
-            torch.stack((key, value)) if return_present else None,  # None | (2, B, T, head_size)
+            attention_scores @ value,  # (B, T, T) @ (B, T, head_size) -> (B, T, head_size)
+            None if kv_cache is None else torch.stack((key, value)),  # None | (2, B, T, head_size)
         )
 
 
@@ -211,54 +213,53 @@ class MultiHeadAttention(nn.Module):
         self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size, bias=self.bias)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor, past=None, return_present=False) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
         """Apply multiple self-attention heads in parallel and concatenate the result.
 
         Parameters
         ----------
         x : Tensor
             vector representation of input token of size (batch, time-step, channels)
+        kv_cache: None | Tensor
+            key-value cache, but only if not None; if None - it means that it's disabled
+            contains cache for keys and value from all previous steps
 
         Returns
         -------
         Tensor
             output vector of the same size as input
         """
-        # concatenate over channel dimension
-        # out = torch.cat(
-        #     [head(x) for head in self.heads],
-        #     dim=-1,
-        # )  # num_heads * (B, T, head_size) -> (B, T, head_size * num_heads)
-        # out = self.projection(out)  # (B, T, embeddings_size)
-        # return self.dropout(out)  # (B, T, embeddings_size)
-
-        if past is None:
-            past = [None] * self.num_heads
+        # prepare kv-cache for each head
+        if kv_cache is None:
+            kv_cache = [None] * self.num_heads  # nh * None
+        # if kv-cache is not an empty tensor
+        elif kv_cache.numel():
+            kv_cache = kv_cache.unbind(2)  # (2, B, num_heads, T, head_size) -> num_heads * (2, B, T, head_size)
         else:
-            past = past.unbind(2)  # (2, B, nh, T, hs) -> nh * (2, B, T, hs)
+            kv_cache = [kv_cache.detach().clone() for _ in range(self.num_heads)]  # num_heads * empty_tensor
 
-        presents = []
-        outputs = []
-        for head, past_layer in zip(self.heads, past):
-            # present: None | (2, B, T, head_size)
-            out, present = head(x, past_layer, return_present)
-            outputs.append(out)
-            if present is not None:
-                presents.append(present)
+        # apply head and corresponding kv-cache on an input
+        outs = [head(x, kv_head) for head, kv_head in zip(self.heads, kv_cache)]
+        outputs, kv_cache = zip(*outs)
 
-        out = torch.cat(outputs, dim=-1)
-        out = self.projection(out)
-        out = self.dropout(out)
+        output = torch.cat(outputs, dim=-1)  # num_heads * (B, T, head_size) -> (B, T, num_heads * head_size)
+        output = self.dropout(self.projection(output))  # (B, T, num_heads * head_size)
 
-        # if all(x is None for x in presents):
-        if not presents:
-            return out, None
+        # has to be all None or all non-None
+        if any(x is None for x in kv_cache) and any(x is not None for x in kv_cache):
+            raise ValueError("Mixed list of None and non-None values in kv-cache.")
 
-        # Expected: None | # (2, B, nh, T, hs)
-        presents = torch.stack(presents, dim=-2)  # nh * (2, B, T, hs) -> (2, B, T, nh, hs)
-        presents = presents.transpose(2, 3)  # (2, B, nh, T, hs)
+        if all(x is not None for x in kv_cache):
+            kv_cache = torch.stack(
+                kv_cache,
+                dim=-2,
+            )  # num_heads * (2, B, T, head_size) -> (2, B, T, num_heads, head_size)
+            kv_cache = kv_cache.transpose(2, 3)  # (2, B, num_heads, T, head_size)
 
-        return out, presents
+        return (
+            output,  # (B, T, num_heads * head_size)
+            kv_cache,  # num_heads * None | (2, B, num_heads, T, head_size)
+        )
 
 
 class CausalSelfAttention(nn.Module):
@@ -331,7 +332,7 @@ class CausalSelfAttention(nn.Module):
         if self.is_decoder:
             self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
-    def forward(self, x: Tensor, past=None, return_present=False) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
         """Do multi-head attention in a single pass.
 
         Multiply by weight matrix -> split the result into query, key and value -> reshape each one of them
@@ -342,6 +343,9 @@ class CausalSelfAttention(nn.Module):
         ----------
         x : Tensor
             input tensor of shape (batch, time-step, embedding size)
+        kv_cache: None | Tensor
+            key-value cache, but only if not None; if None - it means that it's disabled
+            contains cache for keys and value from all previous steps
 
         Returns
         -------
@@ -368,10 +372,10 @@ class CausalSelfAttention(nn.Module):
         query = query.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
         value = value.view(B, T, self.num_heads, self.head_size).transpose(1, 2)  # (B, nh, T, hs)
 
-        if past is not None:
-            past_key, past_value = past.unbind(dim=0)
-            key = torch.cat((past_key, key), dim=-2)
-            value = torch.cat((past_value, value), dim=-2)
+        if kv_cache is not None:
+            key_cached, value_cached = kv_cache.unbind(dim=0)  # (2, B, T, head_size) -> 2 * (B, T, head_size)
+            key = torch.cat((key_cached, key), dim=-2)  # (B, cache + T, head_size)
+            value = torch.cat((value_cached, value), dim=-2)  # (B, cache + T, head_size)
 
         # to obtain attention scores first do dot product of query and key
         attention_scores = query @ key.mT  # (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
@@ -410,5 +414,5 @@ class CausalSelfAttention(nn.Module):
         output = self.projection(output)  # (B, T, C)
         return (
             self.projection_dropout(output),  # (B, T, C)
-            torch.stack((key, value)) if return_present else None,  # None | # (2, B, nh, T, hs)
+            None if kv_cache is None else torch.stack((key, value)),  # None | # (2, B, nh, T, hs)
         )

@@ -140,7 +140,14 @@ class GPTLanguageModel(nn.Module):
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
 
-    def forward(self, idx: Tensor, *, inference: bool = False, past=None, return_present=False) -> Tensor:
+    def forward(
+        self,
+        idx: Tensor,
+        *,
+        inference: bool = False,
+        kv_cache: None | list[Tensor] = None,
+        pos_idx: None | int = None,
+    ) -> Tensor:
         """Do the whole forward pass for decoder part of transformer.
 
         This forward method includes all steps for decoder:
@@ -156,6 +163,11 @@ class GPTLanguageModel(nn.Module):
         inference: bool
             during inference we don't care about all tokens but the very last one, so we can
             apply final language head only on the last token and save some computations
+        kv_cache: None | list[Tensor]
+            key-value cache, but only if not None; if None - it means that it's disabled
+            contains cache for keys and value from all previous steps
+        pos_idx: None | int
+            index for positional embeddings
 
         Raises
         ------
@@ -177,31 +189,28 @@ class GPTLanguageModel(nn.Module):
 
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        if past is not None:
-            positional_embeddings = self.positional_embedding_table.weight[None, past[0].shape[-2]]
+        if pos_idx:
+            positional_embeddings = self.positional_embedding_table.weight[None, pos_idx]  # (1, C)
         else:
             positional_embeddings = self.positional_embedding_table.weight[:T]  # (T, C)
         x = token_embeddings + positional_embeddings  # (B, T, C)
         x = self.embeddings_dropout(x)  # (B, T, C)
 
         # apply multiple transformer blocks
-        presents = []
-        past = past or [None] * self.num_layers
-        for block, past_layer in zip(self.transformer_blocks, past):
-            x, present = block(x, past_layer, return_present=return_present)
-            presents.append(present)
+        new_kv_cache = []
+        kv_cache = kv_cache or [None] * self.num_layers
+        for block, kv_cache_layer in zip(self.transformer_blocks, kv_cache):
+            x, new_kv = block(x, kv_cache_layer)
+            new_kv_cache.append(new_kv)
         # apply final normalization and generate logits for each token in vocabulary
         x = self.layer_norm(x)  # (B, T, C)
 
         # during inference we don't need to encode all token predictions,
         # only the last one (newly generated)
-        # assert not (inference and past), "either inference optimizations or kv-cache"
         if inference:
             return (
-                # TODO: figure out why this doesn't work
-                # self.language_model_head(x[:, -1, :]),  # (B, 1, vocab_size)
-                self.language_model_head(x),
-                presents,  # num_layers * (2, B, num_heads, T, head_size)
+                self.language_model_head(x[:, -1:, :]),  # (B, 1, vocab_size)
+                new_kv_cache,  # num_layers * (2, B, num_heads, T, head_size)
             )
         return self.language_model_head(x)  # (B, T, vocab_size)
 
@@ -314,21 +323,23 @@ class GPTLanguageModel(nn.Module):
         """
         if use_kv_cache and max_new_tokens > self.context_size:
             raise ValueError(
-                "With kv-cache number of new tokens should not be greater than context size with which model was trained, "
+                "With kv-cache number of new tokens should not be greater than context size of the model, "
                 f"but was requested '{max_new_tokens}' new tokens with '{self.context_size}' context size",
             )
-        past = None  # None | (2, B, nh, T, hs)
-        for _ in range(max_new_tokens):
+        kv_cache = [torch.empty(2, 0) for _ in range(self.num_layers)] if use_kv_cache else None
+        for iteration in range(max_new_tokens):
+            # with kv-cache use only last token, without - crop to the last block_size
             if use_kv_cache:
-                # use only the last token with kv-cache
                 context = idx[:, -1:]
             else:
-                # crop idx to the last block_size items
                 context = idx[:, -self.context_size :]
-                past = None
+                kv_cache = None
             # get the predictions
-            logits, past = self(
-                context, past=past, inference=True, return_present=use_kv_cache
+            logits, kv_cache = self(
+                context,
+                inference=True,
+                kv_cache=kv_cache,
+                pos_idx=iteration if use_kv_cache else None,
             )  # (B, T, C), with inference=True -> (1, 1, C)
             # focus only on the last time step and scale by desired temperature
             logits = logits[:, -1, :] / temperature  # becomes (B, C)
@@ -344,7 +355,5 @@ class GPTLanguageModel(nn.Module):
             idx_next = torch.multinomial(probs, num_samples=1)  # (B, 1)
             # append sampled index to the running sequence
             idx = torch.cat((idx, idx_next), dim=1)  # (B, T + 1)
-
-        print(idx)
 
         return idx
