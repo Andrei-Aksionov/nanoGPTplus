@@ -224,6 +224,11 @@ class MultiHeadAttention(nn.Module):
             key-value cache, but only if not None; if None - it means that it's disabled
             contains cache for keys and value from all previous steps
 
+        Raises
+        ------
+        ValueError
+            if new key-value cache is mixed with None and non-None values
+
         Returns
         -------
         Tensor
