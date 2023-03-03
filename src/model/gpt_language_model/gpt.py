@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor, nn
+from tqdm import trange
 
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
 
@@ -326,8 +327,8 @@ class GPTLanguageModel(nn.Module):
                 "With kv-cache number of new tokens should not be greater than context size of the model, "
                 f"but was requested '{max_new_tokens}' new tokens with '{self.context_size}' context size",
             )
-        kv_cache = [torch.empty(2, 0) for _ in range(self.num_layers)] if use_kv_cache else None
-        for iteration in range(max_new_tokens):
+        kv_cache = [torch.empty(2, 0, device=idx.device) for _ in range(self.num_layers)] if use_kv_cache else None
+        for iteration in trange(max_new_tokens):
             # with kv-cache use only last token, without - crop to the last block_size
             if use_kv_cache:
                 context = idx[:, -1:]
