@@ -20,7 +20,7 @@ def generate_new_tokens(
     use_kv_cache: bool,
     temperature: float,
     fix_seed: bool,
-    continue_words: str,
+    continue_tokens: str,
 ) -> None:
     """Generate new tokens with help of pre-trained model.
 
@@ -42,12 +42,12 @@ def generate_new_tokens(
         temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness
     fix_seed: bool
         might be useful for debugging to have the same output every time, if so, then set fix_seed=True
-    continue_words: str
-        new token should be generated as a continuation of words in 'continue_words' variable
+    continue_tokens: str
+        new token should be generated as a continuation of tokens in 'continue_tokens' variable
     """
     if fix_seed:
         set_seed(config.seed)
-        logger.debug("Fixed seed for token generation.")
+    logger.debug(f"Random seed is {'' if fix_seed else 'not'} fixed for token generation.")
     # get device and model's config
     device = device or get_device()
     model_config = get_model_config(model_class, config, size)
@@ -59,10 +59,9 @@ def generate_new_tokens(
     model.to(device)
 
     # generate tokens
-    start = perf_counter()
+    start_time = perf_counter()
     logger.debug("Generating tokens on '{}' device".format(device))
-    print(f"{continue_words=}")
-    tokens = tokenizer.encode(continue_words)
+    tokens = tokenizer.encode(continue_tokens)
     context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
     new_tokens = tokenizer.decode(
         model.generate(
@@ -75,7 +74,7 @@ def generate_new_tokens(
         .tolist(),
     )
     logger.info("New generated tokens: {}".format(new_tokens))
-    logger.debug("Token generation took: {:.4f} seconds".format(perf_counter() - start))
+    logger.debug("Token generation took: {:.4f} seconds".format(perf_counter() - start_time))
 
 
 def main() -> None:
@@ -111,7 +110,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--use-kv-cache",
-        help="Use ke-value cache for speed up token generation",
+        help="Use kv-value cache to speed up token generation",
         action="store_true",
         required=False,
     )
@@ -130,9 +129,9 @@ def main() -> None:
         required=False,
     )
     parser.add_argument(
-        "--continue-words",
+        "--continue-tokens",
         default=" ",
-        help="Generation should continue these words",
+        help="Generation should continue these tokens",
         required=False,
         type=str,
     )

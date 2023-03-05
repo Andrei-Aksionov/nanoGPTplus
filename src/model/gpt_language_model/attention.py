@@ -77,7 +77,7 @@ class SelfAttentionHead(nn.Module):
         x : Tensor
             input tensor containing vector representation of x
         kv_cache: None | Tensor
-            key-value cache, but only if not None; if None - it means that it's disabled
+            key-value cache, but only if not None; if None - it means that it's disabled;
             contains cache for keys and value from all previous steps
 
         Returns
@@ -221,7 +221,7 @@ class MultiHeadAttention(nn.Module):
         x : Tensor
             vector representation of input token of size (batch, time-step, channels)
         kv_cache: None | Tensor
-            key-value cache, but only if not None; if None - it means that it's disabled
+            key-value cache, but only if not None; if None - it means that it's disabled;
             contains cache for keys and value from all previous steps
 
         Raises
@@ -349,7 +349,7 @@ class CausalSelfAttention(nn.Module):
         x : Tensor
             input tensor of shape (batch, time-step, embedding size)
         kv_cache: None | Tensor
-            key-value cache, but only if not None; if None - it means that it's disabled
+            key-value cache, but only if not None; if None - it means that it's disabled;
             contains cache for keys and value from all previous steps
 
         Returns

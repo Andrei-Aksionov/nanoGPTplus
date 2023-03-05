@@ -93,7 +93,8 @@ The purpose of it is to better understand how Transformer architecture works by 
     - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
     - Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
     - Fixed seed: `--fix-seed` **[Optional]**: if provided will fix to the seed specified in config file
-    - Key-value cache: `--use-kv-cache` **[Optional]**: if provided will use key-value cache for new tokens generation; if provided `--max-new-tokens` should not be greater than context_size of the model (one can check this parameter in the config file)
+    - Key-value cache: `--use-kv-cache` **[Optional]**: if provided will use key-value cache for new tokens generation; if provided `--max-new-tokens` should not be greater than context_size of the model (one can check this parameter in the config file) plus initial context (`--continue-words`)
+    - Initial context: `--continue-words` **[Optional]**: if provided the model will generate new tokens that continue provided ones
 
     ```python
     python src/model/generate.py --model gpt --size large --max-new-tokens 100
