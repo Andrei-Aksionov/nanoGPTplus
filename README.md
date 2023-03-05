@@ -9,7 +9,7 @@ In this repository I want to rewrite the code for `nanoGPT` presented by Andrej 
 
 The purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with as few issues as possible).
 
-**Important Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) if you have one then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
+> **Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) I haven't added GPU specific code, so if you have one (GPU or even a node) then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
 
 <p align=center><img src="references/readme/amazon_prime.jpg"></p>
 

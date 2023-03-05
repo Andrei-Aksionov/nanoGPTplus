@@ -20,6 +20,7 @@ def generate_new_tokens(
     use_kv_cache: bool,
     temperature: float,
     fix_seed: bool,
+    continue_words: str,
 ) -> None:
     """Generate new tokens with help of pre-trained model.
 
@@ -41,6 +42,8 @@ def generate_new_tokens(
         temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness
     fix_seed: bool
         might be useful for debugging to have the same output every time, if so, then set fix_seed=True
+    continue_words: str
+        new token should be generated as a continuation of words in 'continue_words' variable
     """
     if fix_seed:
         set_seed(config.seed)
@@ -58,7 +61,8 @@ def generate_new_tokens(
     # generate tokens
     start = perf_counter()
     logger.debug("Generating tokens on '{}' device".format(device))
-    tokens = tokenizer.encode(" ")
+    print(f"{continue_words=}")
+    tokens = tokenizer.encode(continue_words)
     context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
     new_tokens = tokenizer.decode(
         model.generate(
@@ -124,6 +128,13 @@ def main() -> None:
         help="Make token generation deterministic",
         action="store_true",
         required=False,
+    )
+    parser.add_argument(
+        "--continue-words",
+        default=" ",
+        help="Generation should continue these words",
+        required=False,
+        type=str,
     )
     args = vars(parser.parse_args())
     model_name = models[args.pop("model")]

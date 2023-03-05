@@ -190,7 +190,9 @@ class GPTLanguageModel(nn.Module):
 
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
-        if pos_idx:
+        # if pos_idx is not None and idx.shape[-1] == 1:
+        if kv_cache is not None and kv_cache[0].numel():
+            pos_idx = kv_cache[0].shape[-2]
             positional_embeddings = self.positional_embedding_table.weight[None, pos_idx]  # (1, C)
         else:
             positional_embeddings = self.positional_embedding_table.weight[:T]  # (T, C)
@@ -199,7 +201,9 @@ class GPTLanguageModel(nn.Module):
 
         # apply multiple transformer blocks
         new_kv_cache = []
-        kv_cache = kv_cache or [None] * self.num_layers
+        # kv_cache = kv_cache or [None] * self.num_layers
+        if kv_cache is None:
+            kv_cache = [None] * self.num_layers
         for block, kv_cache_layer in zip(self.transformer_blocks, kv_cache):
             x, new_kv = block(x, kv_cache_layer)
             new_kv_cache.append(new_kv)
@@ -327,20 +331,25 @@ class GPTLanguageModel(nn.Module):
                 "With kv-cache number of new tokens should not be greater than context size of the model, "
                 f"but was requested '{max_new_tokens}' new tokens with '{self.context_size}' context size",
             )
-        kv_cache = [torch.empty(2, 0, device=idx.device) for _ in range(self.num_layers)] if use_kv_cache else None
-        for iteration in trange(max_new_tokens):
+        kv_cache = (
+            [torch.empty(2, 0, device=idx.device, dtype=idx.dtype) for _ in range(self.num_layers)]
+            if use_kv_cache
+            else None
+        )
+        for iteration in trange(max_new_tokens, ascii=True):
             # with kv-cache use only last token, without - crop to the last block_size
-            if use_kv_cache:
-                context = idx[:, -1:]
-            else:
+            if not use_kv_cache or (iteration == 0 and idx.shape[-1] > 1):
                 context = idx[:, -self.context_size :]
-                kv_cache = None
+                if not use_kv_cache:
+                    kv_cache = None
+            else:
+                context = idx[:, -1:]
             # get the predictions
             logits, kv_cache = self(
                 context,
                 inference=True,
                 kv_cache=kv_cache,
-                pos_idx=iteration if use_kv_cache else None,
+                pos_idx=iteration,
             )  # (B, T, C), with inference=True -> (1, 1, C)
             # focus only on the last time step and scale by desired temperature
             logits = logits[:, -1, :] / temperature  # becomes (B, C)
