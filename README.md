@@ -73,7 +73,7 @@ The purpose of it is to better understand how Transformer architecture works by 
 
     Train script accepts multiple arguments:
     - Model name: `--model [bigram, gpt]` .
-    - Model size: `--size [small, large]` (small is good for debugging alongside with dataset fraction).
+    - Model size: `--size [small, medium, large]` (small is good for debugging alongside with dataset fraction).
     - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
     - Dataset fraction: `--dataset-fraction` **[Optional]**: useful if one wants to quickly run training for debugging (affects both training and testing datasets). If not provided the whole dataset will be used.
 
@@ -89,7 +89,7 @@ The purpose of it is to better understand how Transformer architecture works by 
 
     Generation script accepts multiple arguments:
     - Model name: `--model [bigram, gpt]` .
-    - Model size: `--size [small, large]` (small is good for debugging).
+    - Model size: `--size [small, medium, large]` (small is good for debugging).
     - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
     - Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
 
