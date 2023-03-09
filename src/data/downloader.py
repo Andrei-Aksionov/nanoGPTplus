@@ -33,6 +33,7 @@ def download(config: DictConfig, *, override_if_exists: bool = True) -> Path:
         return file_path
 
     response = requests.get(url, timeout=30)
+    response.raise_for_status()
     with file_path.open("wb") as fout:
         fout.write(response.content)
     logger.debug("Downloading is finished")

@@ -2,7 +2,7 @@
 authors = ["Andrei.Aksionov"]
 description = "Knock-off Andrej Karpathy's nanoGPT"
 license = "MIT"
-name = "nanogpt"
+name = "nanogptplus"
 packages = [{include = "src"}]
 readme = "README.md"
 version = "1.0.0"
@@ -14,13 +14,10 @@ matplotlib = "~3.6.3"
 numpy = "~1.24.1"
 omegaconf = "~2.3.0"
 pandas = "~1.5.2"
-python = "~3.10.8"
+python = "^3.8.0"
 requests = "~2.28.1"
 tensorboard = "~2.12.0"
-torch = [
-  {version = "~1.13.0+cpu", platform = "darwin"},
-  {version = "~1.13.0", platform = "linux"},
-]
+torch = "~1.13.0"
 tqdm = "~4.64.1"
 
 [tool.poetry.group.dev.dependencies]
@@ -28,7 +25,18 @@ black = {version = "*", extras = ["jupyter"]}
 darglint = "~1.8.1"
 ipywidgets = "~8.0.4"
 pre-commit = "~3.0.4"
-ruff = "*"
+ruff = "0.0.254"
+
+[tool.poetry.group.test.dependencies]
+pytest = "~7.2.2"
+pytest-order = "~1.0.1"
+
+[tool.pytest.ini_options]
+markers = [
+  "smoke: mark for short tests (deselect with '-m \"not smoke\"')",
+]
+python_files = "*_test.py"
+testpaths = ["tests"]
 
 [tool.ruff]
 ignore = [
@@ -55,14 +63,15 @@ line-length = 120
 select = [
   "ALL",
 ]
-target-version = "py310"
+target-version = "py38"
 
 [tool.ruff.pydocstyle]
 convention = "pep257"
 
 [tool.ruff.per-file-ignores]
 # D102 - Missing docstring in public method
-"*_test.py" = ["D102"]
+# S101 - Use of `assert` detected
+"*_test.py" = ["D102", "S101"]
 # D104 - missing docstring in public method
 # F401 - imported but unused
 "__init__.py" = [

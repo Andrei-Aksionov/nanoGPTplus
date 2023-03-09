@@ -1,18 +1,24 @@
 import argparse
+from typing import Optional
 
 import torch
 from loguru import logger
 
 from src import config
 from src.model import BigramLanguageModel, GPTLanguageModel
-from src.utils import get_device, grab_arguments
-from src.utils.arguments import RangeChecker
-from src.utils.model import get_model_config, load_checkpoint, pickle_load
+from src.utils import (
+    RangeChecker,
+    get_device,
+    get_model_config,
+    grab_arguments,
+    load_checkpoint,
+    pickle_load,
+)
 
 
 def generate_new_tokens(
     model_class: torch.nn.Module,
-    device: str | None,
+    device: Optional[str],
     size: str,
     max_new_tokens: int,
     temperature: float,
@@ -24,7 +30,7 @@ def generate_new_tokens(
     model_class : torch.nn.Module
         which model to use in order to generate new tokens. The model should be pre-trained
         and weights should be stored in the folder that is specified in the config file
-    device : str | None
+    device : Optional[str]
         on which device to run token generation
     size : str
         the size of the model (small or large). Corresponding weights should exist in the folder
@@ -75,7 +81,7 @@ def main() -> None:
     parser.add_argument(
         "--size",
         "-s",
-        choices=["small", "large"],
+        choices=["small", "medium", "large"],
         help="The size of the model (small or large)",
     )
     parser.add_argument(

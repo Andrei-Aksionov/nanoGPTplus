@@ -1,7 +1,13 @@
+
 <p>
     <h2 align="center">Welcome to NanoGPT+ in PyTorch</h2>
     <h5 align="center">Knock-off edition (but with enchantments)<h5>
 </p>
+
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
+[![test](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml/badge.svg)](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml)
 
 ***
 
@@ -9,7 +15,7 @@ In this repository I want to rewrite the code for `nanoGPT` presented by Andrej 
 
 The purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with as few issues as possible).
 
-**Important Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) if you have one then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
+> **Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) I haven't added GPU specific code, so if you have one (GPU or even a node) then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
 
 <p align=center><img src="references/readme/amazon_prime.jpg"></p>
 
@@ -47,6 +53,8 @@ The purpose of it is to better understand how Transformer architecture works by 
     - *train.py*: code to train language model
     - *trainer.py*: code to do all the necessary step for training and evaluating the model
   - **utils**: various utils files
+- **tests**
+  - **smoke**: include smoke tests for quick testing of repo functionality (download data, train and generate new tokens)
 - *pyproject.toml*: package dependencies are stored here and managed py [Poetry](https://python-poetry.org/)
 
 # How to use it
@@ -92,10 +100,27 @@ The purpose of it is to better understand how Transformer architecture works by 
     - Model size: `--size [small, medium, large]` (small is good for debugging).
     - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
     - Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
+    - Temperature: `--temperature` **[Optional]**: if the value is above 1 - less randomness in token generation, if less then 1 - more randomness. Usefull if you want to make token prediction more diverse, but the cost of it will be lower accuracy of generated tokens.
 
     ```python
     python src/model/generate.py --model gpt --size large --max-new-tokens 100
     ```
+
+## Run tests
+
+[Pytest](https://github.com/pytest-dev/pytest) framework is used for tests execution so in order to run all tests simply type:
+
+```sh
+pytest
+```
+
+It will run all test. For now only smoke tests are implemented.
+
+If one want to see also standard output in pytest logs (for example for tests of training):
+
+```sh
+pytest --include=sys
+```
 
 ***
 

@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -128,7 +129,7 @@ class MultiHeadAttention(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: None | int,
+        head_size: Optional[int],
         num_heads: int,
         bias: bool,
         dropout: float,
@@ -149,7 +150,7 @@ class MultiHeadAttention(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : None | int
+        head_size : Optional[int]
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without remainder
@@ -230,7 +231,7 @@ class CausalSelfAttention(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: None | int,
+        head_size: Optional[int],
         num_heads: int,
         bias: bool,
         dropout: float,
@@ -249,7 +250,7 @@ class CausalSelfAttention(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : None | int
+        head_size : Optional[int]
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without remainder
