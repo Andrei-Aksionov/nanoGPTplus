@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 
 import torch
 
@@ -9,7 +10,7 @@ class CosineWarmupLRSchedular:
         optimizer: torch.optim.Optimizer,
         warmup_iters: int,
         lr_decay_iters: int,
-        min_lr: None | float = None,
+        min_lr: Optional[float] = None,
     ) -> None:
         """Cosine learning rate schedular with warmup.
 
@@ -21,7 +22,7 @@ class CosineWarmupLRSchedular:
             for how long learning rate will be linearly increasing from min_lr to learning_rate
         lr_decay_iters : int
             for how long learning rate will be linearly decreasing after warmup is finished
-        min_lr : None | float, optional
+        min_lr : Optional[float], optional
             this learning rate will be applied after lr decay is finished, by default None
         """
         self.optimizer = optimizer

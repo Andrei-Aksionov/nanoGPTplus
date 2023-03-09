@@ -1,6 +1,7 @@
 import argparse
 import inspect
 from pathlib import Path
+from typing import Optional
 
 import torch
 from loguru import logger
@@ -15,7 +16,12 @@ from src.utils.arguments import RangeChecker
 from src.utils.model import get_model_config, pickle_dump
 
 
-def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_fraction: float | None = None) -> None:
+def train(
+    model_class: torch.nn.Module,
+    device: Optional[str],
+    size: str,
+    dataset_fraction: Optional[float] = None,
+) -> None:
     """Train a language model.
 
     Performs 4 steps:
@@ -28,12 +34,12 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
     ----------
     model_class : torch.nn.Module
         what language model to use
-    device: str | None
+    device: Optional[str]
         on what device to train, if not provided will try to figure out what device to use such as:
         if gpu (cuda or mps) is available will use it, if not - cpu
     size: str
         a model has two configs: small and large. Small is used for debug purpose as it's fast
-    dataset_fraction: float | None
+    dataset_fraction: Optional[float]
         for debugging purposes one might want to run training only on a small fraction of a dataset
     """
     # set seed for reproducibility

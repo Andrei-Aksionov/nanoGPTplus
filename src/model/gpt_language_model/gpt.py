@@ -1,5 +1,6 @@
 import math
 from functools import reduce
+from typing import Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -15,14 +16,14 @@ class GPTLanguageModel(nn.Module):
         vocab_size: int,
         embeddings_size: int,
         context_size: int,
-        head_size: None | int,
+        head_size: Optional[int],
         num_heads: int,
         feed_forward_scaling: int,
         num_layers: int,
         bias: bool,
         dropout: float,
         weight_tying: bool = True,
-        weight_decay: None | float = None,
+        weight_decay: Optional[float] = None,
     ) -> None:
         """Create Generative Pre-trained Transformer model (decoder part of transformer architecture).
 
@@ -35,7 +36,7 @@ class GPTLanguageModel(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : None | int
+        head_size : Optional[int]
             the size of output of self-attention
         num_heads : int
             how many self-attention heads to use
@@ -53,7 +54,7 @@ class GPTLanguageModel(nn.Module):
            softmax layers. This method also massively reduces the total number of parameters in the language models that
            it is applied to.
            https://paperswithcode.com/method/weight-tying, by default True
-        weight_decay: None | float
+        weight_decay: Optional[float]
             if provided will prepare parameters for optimizer
         """
         super().__init__()
@@ -140,7 +141,7 @@ class GPTLanguageModel(nn.Module):
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
 
-    def __optimizer_parameters(self, weight_decay: float) -> list[dict, dict]:
+    def __optimizer_parameters(self, weight_decay: float) -> Tuple[dict, dict]:
         """Configure optimizer with weight decay for nn.Linear.
 
         Parameters
@@ -150,7 +151,7 @@ class GPTLanguageModel(nn.Module):
 
         Returns
         -------
-        list[dict, dict]
+        Tuple[dict, dict]
             list of two dictionaries, containing parameter names that will have weight decay
             and that will not accordingly
 
@@ -263,7 +264,7 @@ class GPTLanguageModel(nn.Module):
         idx: Tensor,
         max_new_tokens: int,
         temperature: float = 1.0,
-        top_k_logits: None | int = None,
+        top_k_logits: Optional[int] = None,
     ) -> Tensor:
         """Generate new character after the current one.
 
@@ -282,7 +283,7 @@ class GPTLanguageModel(nn.Module):
             the highest probability. The generated text will be more diverse, but there is a higher possibility of
             grammar mistakes and generation of nonsense.
             https://ai.stackexchange.com/questions/32477/what-is-the-temperature-in-the-gpt-models, by default 1.0
-        top_k_logits : None | int, optional
+        top_k_logits : Optional[int], optional
             only top K logits (with the highest value) will be kept, by default None
 
         Returns
