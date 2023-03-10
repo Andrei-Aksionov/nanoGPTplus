@@ -116,7 +116,7 @@ pytest
 
 It will run all test. For now only smoke tests are implemented.
 
-If one want to see also standard output in pytest logs (for example for tests of training):
+If one wants to see also standard output in pytest logs (for example for tests of training):
 
 ```sh
 pytest --include=sys

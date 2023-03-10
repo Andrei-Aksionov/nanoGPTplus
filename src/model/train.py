@@ -1,5 +1,6 @@
 import argparse
 import inspect
+import multiprocessing
 from pathlib import Path
 from typing import Optional
 
@@ -72,16 +73,17 @@ def train(
     test_split = int(len(data) * config.dataloader.test_split)
     train_data, test_data = data[:test_split], data[test_split:]
     # Step 3.2. Create data loaders
+    num_workers = min(multiprocessing.cpu_count(), config.dataloader.num_workers)
     train_dataloader = DataLoader(
         NextTokenDataset(train_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
-        num_workers=config.dataloader.num_workers,
+        num_workers=num_workers,
         shuffle=True,
     )
     test_dataloader = DataLoader(
         NextTokenDataset(test_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
-        num_workers=config.dataloader.num_workers,
+        num_workers=num_workers,
         shuffle=False,
     )
     logger.info("Data loaders are prepared.")
