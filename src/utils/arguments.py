@@ -73,8 +73,9 @@ class RangeChecker:
             return self.start <= other <= self.end
         if self.inclusive_start:
             return self.start <= other < self.end
-        if self.inclusive_end:  # noqa: RET503
+        if self.inclusive_end:
             return self.start < other <= self.end
+        return self.start < other < self.end
 
     def __contains__(self, item: Number) -> bool:
         return self.__eq__(item)
@@ -83,4 +84,10 @@ class RangeChecker:
         yield self
 
     def __str__(self) -> str:
-        return f"[{self.start},{self.end}]"
+        if self.inclusive_start and self.inclusive_end:
+            return f"[{self.start},{self.end}]"
+        if self.inclusive_start:
+            return f"[{self.start},{self.end})"
+        if self.inclusive_end:
+            return f"({self.start},{self.end}]"
+        return f"({self.start},{self.end})"
