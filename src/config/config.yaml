@@ -31,8 +31,8 @@ model:
           - 0.9
           - 0.99
         # lr schedular
-        warmup_iters: null
-        lr_decay_iters: null
+        warmup_iters: 0.0
+        lr_decay_iters: 1.0
         grad_accumulation_steps: 1
         epochs: 1
         tqdm_update_interval: 100
@@ -115,3 +115,10 @@ model:
         tqdm_update_interval: 10
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
         tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_small.pkl
+
+logs:
+  folder: logs
+  logger_kwargs:
+    rotation: 50 MB
+  training: ${logs.folder}/training.log
+  generation: ${logs.folder}/generation.log
