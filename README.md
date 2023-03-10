@@ -101,6 +101,8 @@ The purpose of it is to better understand how Transformer architecture works by 
     - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
     - Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
     - Temperature: `--temperature` **[Optional]**: if the value is above 1 - less randomness in token generation, if less then 1 - more randomness. Usefull if you want to make token prediction more diverse, but the cost of it will be lower accuracy of generated tokens.
+    - Fixed seed: `--fix-seed` **[Optional]**: if provided will fix to the seed specified in config file
+    - Initial context: `--continue-words` **[Optional]**: if provided the model will generate new tokens that continue provided ones
 
     ```python
     python src/model/generate.py --model gpt --size large --max-new-tokens 100

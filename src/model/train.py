@@ -10,11 +10,20 @@ from torch.utils.data import DataLoader
 
 from src import config
 from src.data import CharTokenizer, NextTokenDataset
-from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
-from src.model.gpt_language_model.optimizers import CosineWarmupLRSchedular
-from src.utils import get_device, grab_arguments, set_seed
-from src.utils.arguments import RangeChecker
-from src.utils.model import get_model_config, pickle_dump
+from src.model import (
+    BigramLanguageModel,
+    CosineWarmupLRSchedular,
+    GPTLanguageModel,
+    Trainer,
+)
+from src.utils import (
+    RangeChecker,
+    get_device,
+    get_model_config,
+    grab_arguments,
+    pickle_dump,
+    set_seed,
+)
 
 
 def train(
@@ -43,8 +52,12 @@ def train(
     dataset_fraction: Optional[float]
         for debugging purposes one might want to run training only on a small fraction of a dataset
     """
+    # set up logger to write also in a file
+    logger.add(config.logs.training, **config.logs.logger_kwargs)
+
     # set seed for reproducibility
     set_seed(config.seed)
+    logger.debug("Random seed is fixed for training.")
 
     # assign model's config to a variable
     model_config = get_model_config(model_class, config, size)
@@ -107,15 +120,20 @@ def train(
         **extra_args,
     )
     # Step 4.3 Configure LR schedular
-    if "warmup_iters" not in model_config or not model_config.warmup_iters:
+    # if warmup/lr_decay iters is None - set default
+    # if it's a float - use it as a portion
+    # else - use as is
+    warmup_iters = model_config.get("warmup_iters")
+    if warmup_iters is None:
         warmup_iters = int(len(train_dataloader) * 0.1)
-    else:
-        warmup_iters = model_config.warmup_iters
-    logger.debug("Warmup iters: {}".format(warmup_iters))
-    if "lr_decay_iters" not in model_config or not model_config.lr_decay_iters:
+    elif isinstance(warmup_iters, float):
+        warmup_iters = int(len(train_dataloader) * warmup_iters)
+    logger.debug("LR warmup iters: {}".format(warmup_iters))
+    lr_decay_iters = model_config.get("lr_decay_iters")
+    if lr_decay_iters is None:
         lr_decay_iters = int(len(train_dataloader) * 0.95)
-    else:
-        lr_decay_iters = model_config.lr_decay_iters
+    elif isinstance(lr_decay_iters, float):
+        lr_decay_iters = int(len(train_dataloader) * lr_decay_iters)
     logger.debug("LR decay iters: {}".format(lr_decay_iters))
     lr_schedular = CosineWarmupLRSchedular(
         optimizer=optimizer,

@@ -1,4 +1,5 @@
 import argparse
+from time import perf_counter
 from typing import Optional
 
 import torch
@@ -13,6 +14,7 @@ from src.utils import (
     grab_arguments,
     load_checkpoint,
     pickle_load,
+    set_seed,
 )
 
 
@@ -22,6 +24,8 @@ def generate_new_tokens(
     size: str,
     max_new_tokens: int,
     temperature: float,
+    fix_seed: bool,
+    continue_tokens: str,
 ) -> None:
     """Generate new tokens with help of pre-trained model.
 
@@ -39,7 +43,19 @@ def generate_new_tokens(
         how many tokens to generate
     temperature: float
         temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness
+    fix_seed: bool
+        might be useful for debugging to have the same output every time, if so, then set fix_seed=True
+    continue_tokens: str
+        new token should be generated as a continuation of tokens in 'continue_tokens' variable
     """
+    # set up logger to write also in a file
+    logger.add(config.logs.generation, **config.logs.logger_kwargs)
+
+    # if specified set seed for reproducibility
+    if fix_seed:
+        set_seed(config.seed)
+    logger.debug(f"Random seed is {'' if fix_seed else 'NOT '}fixed for token generation.")
+
     # get device and model's config
     device = device or get_device()
     model_config = get_model_config(model_class, config, size)
@@ -51,8 +67,9 @@ def generate_new_tokens(
     model.to(device)
 
     # generate tokens
+    start_time = perf_counter()
     logger.debug("Generating tokens on '{}' device".format(device))
-    tokens = tokenizer.encode(" ")
+    tokens = tokenizer.encode(continue_tokens)
     context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
     new_tokens = tokenizer.decode(
         model.generate(
@@ -64,6 +81,7 @@ def generate_new_tokens(
         .tolist(),
     )
     logger.info("New generated tokens: {}".format(new_tokens))
+    logger.debug("Token generation took: {:.4f} seconds".format(perf_counter() - start_time))
 
 
 def main() -> None:
@@ -81,7 +99,7 @@ def main() -> None:
     parser.add_argument(
         "--size",
         "-s",
-        choices=["small", "medium", "large"],
+        choices=["small", "large"],
         help="The size of the model (small or large)",
     )
     parser.add_argument(
@@ -104,6 +122,19 @@ def main() -> None:
         help="Temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness",
         required=False,
         type=float,
+    )
+    parser.add_argument(
+        "--fix-seed",
+        help="Make token generation deterministic",
+        action="store_true",
+        required=False,
+    )
+    parser.add_argument(
+        "--continue-tokens",
+        default=" ",
+        help="Generation should continue these tokens",
+        required=False,
+        type=str,
     )
     args = vars(parser.parse_args())
     model_name = models[args.pop("model")]
