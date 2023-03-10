@@ -99,7 +99,7 @@ def main() -> None:
     parser.add_argument(
         "--size",
         "-s",
-        choices=["small", "large"],
+        choices=["small", "medium", "large"],
         help="The size of the model (small or large)",
     )
     parser.add_argument(
