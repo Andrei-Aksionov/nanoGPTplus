@@ -5,6 +5,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
+from src.utils import log_error
+
 
 class SelfAttentionHead(nn.Module):
     def __init__(
@@ -172,9 +174,10 @@ class MultiHeadAttention(nn.Module):
 
         if not head_size:
             if embeddings_size % num_heads != 0:
-                msg = "Embeddings size should be divisible by number of heads without remainder, "
-                f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
-                raise ValueError(msg)
+                log_error(
+                    "Embeddings size should be divisible by number of heads without remainder, "
+                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
+                )
             head_size = embeddings_size // num_heads
 
         self.embeddings_size = embeddings_size
@@ -272,9 +275,10 @@ class CausalSelfAttention(nn.Module):
 
         if not head_size:
             if embeddings_size % num_heads != 0:
-                msg = "Embeddings size should be divisible by the number of heads without a residual, "
-                f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
-                raise ValueError(msg)
+                log_error(
+                    "Embeddings size should be divisible by the number of heads without a residual, "
+                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
+                )
             head_size = embeddings_size // num_heads
 
         self.embeddings_size = embeddings_size

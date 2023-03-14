@@ -3,6 +3,8 @@ from typing import Optional
 
 import torch
 
+from src.utils import log_error
+
 
 class CosineWarmupLRSchedular:
     def __init__(
@@ -41,8 +43,7 @@ class CosineWarmupLRSchedular:
         # during lr decay (after warmup) use cosine decay from learning_rate down to min_lr
         decay_ratio = (iteration - self.warmup_iters) / (self.lr_decay_iters - self.warmup_iters)
         if not (0 <= decay_ratio <= 1):
-            msg = f"Decay ratio has to be in range [0, 1], but it's actually equal to {decay_ratio}"
-            raise ValueError(msg)
+            log_error(f"Decay ratio has to be in range [0, 1], but it's actually equal to {decay_ratio}")
         coefficient = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coefficient ranges 0..1
         return self.min_lr + coefficient * (self.learning_rate - self.min_lr)
 

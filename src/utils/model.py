@@ -2,7 +2,8 @@ import pickle
 from pathlib import Path
 
 import torch
-from loguru import logger
+
+from src.utils import log_error
 
 
 def pickle_dump(file_to_save: object, path: str) -> None:
@@ -98,7 +99,5 @@ def get_model_config(model_class: torch.nn.Module, config: dict, size: str) -> d
         "GPTLanguageModel": config.model.gpt,
     }.get(model_class_name)
     if model_config is None:
-        msg = f"There is no config for class '{model_class_name}'"
-        logger.critical(msg)
-        raise ValueError(msg)
+        log_error(f"There is no config for class '{model_class_name}'")
     return model_config.size[size]

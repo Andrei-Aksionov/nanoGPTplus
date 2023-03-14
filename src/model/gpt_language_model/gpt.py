@@ -9,6 +9,7 @@ from torch import Tensor, nn
 from tqdm import trange
 
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
+from src.utils import log_error
 
 
 class GPTLanguageModel(nn.Module):
@@ -168,8 +169,7 @@ class GPTLanguageModel(nn.Module):
             # get the parent module by the parameter's name
             module = reduce(lambda module, key: getattr(module, key), pn.split(".")[:-1], self)
             if type(module) not in expected_weight_modules:
-                msg = f"Expected the module to be one of '{expected_weight_modules}', but got {type(module)}"
-                raise ValueError(msg)
+                log_error(f"Expected the module to be one of '{expected_weight_modules}', but got {type(module)}")
             if isinstance(module, nn.Linear) and pn.endswith("weight"):
                 decay.add(pn)
             else:
@@ -213,9 +213,10 @@ class GPTLanguageModel(nn.Module):
         # batch, time-step
         B, T = idx.shape  # noqa: N806
         if self.context_size < T:
-            msg = f"Cannot do forward pass on sequence of length {T}, "
-            f"context size should less or equal to {self.context_size}"
-            raise ValueError(msg)
+            log_error(
+                f"Cannot do forward pass on sequence of length {T}, "
+                "context size should less or equal to {self.context_size}",
+            )
 
         # obtain token embeddings and add positional information
         token_embeddings = self.token_embedding_table(idx)  # (B, T, C)
@@ -295,9 +296,7 @@ class GPTLanguageModel(nn.Module):
         # check that the gpt2 type is supported
         supported_types = ("gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl")
         if gpt2_type not in supported_types:
-            msg = f"Only '{supported_types}' are supported, but '{gpt2_type}' was provided."
-            logger.error(msg)
-            raise ValueError(msg)
+            log_error(f"Only '{supported_types}' are supported, but '{gpt2_type}' was provided.")
 
         # prepare config that will be passed into our GPT implementation
         source_config = GPT2Config.get_config_dict(gpt2_type)[0]
@@ -314,10 +313,8 @@ class GPTLanguageModel(nn.Module):
         }
         # Dropouts for embedding, attention, residual, and summary in Huggingface implementation have to be identical
         dropouts = [(name, value) for name, value in source_config.items() if "dropout" in name]
-        if not all(dropouts[0][1] == x[1] for x in dropouts[1:]):
-            msg = f"All dropouts for GPT2 model should have had the same value, but in fact received '{dropouts}'"
-            logger.error(msg)
-            raise ValueError(msg)
+        if any(dropouts[0][1] != x[1] for x in dropouts[1:]):
+            log_error(f"All dropouts for GPT2 model should have had the same value, but in fact received '{dropouts}'")
         target_config["dropout"] = dropouts[0][1]
 
         # Instantiate GPT model and extract params
@@ -339,9 +336,7 @@ class GPTLanguageModel(nn.Module):
         ]
 
         if len(target_state_dict_keys) != len(source_state_dict_keys):
-            msg = f"Mismatch number of keys between: {len(target_state_dict_keys)} != {len(source_state_dict_keys)}"
-            logger.error(msg)
-            raise ValueError(msg)
+            log_error(f"Mismatch number of keys: {len(target_state_dict_keys)} != {len(source_state_dict_keys)}")
 
         # since names of layers are different for our implementation and the one from Huggingface,
         # we need to map them properly
@@ -378,10 +373,10 @@ class GPTLanguageModel(nn.Module):
             if source_key.endswith(to_transposed):
                 source_weights = source_weights.t()
             if source_weights.shape != target_state_dict[target_key].shape:
-                msg = f"Shape mismatch: shape of source '{source_weights.shape}' and destination - "
-                "'{target_state_dict[target_key].shape}'"
-                logger.error(msg)
-                raise ValueError(msg)
+                log_error(
+                    f"Shape mismatch: shape of source '{source_weights.shape}' and destination - "
+                    f"'{target_state_dict[target_key].shape}'",
+                )
             with torch.no_grad():
                 target_state_dict[target_key].copy_(source_weights)
         logger.debug("Weights are copied.")
