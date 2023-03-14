@@ -6,8 +6,10 @@ import torch
 import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor, nn
+from tqdm import tqdm, trange
 
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
+from src.utils.seed import set_seed
 
 
 class GPTLanguageModel(nn.Module):
@@ -93,7 +95,7 @@ class GPTLanguageModel(nn.Module):
                 for _ in range(self.num_layers)
             ],
         )
-        self.layer_norm = LayerNorm(self.embeddings_size, bias=self.bias)  # final layer norm
+        self.layer_norm_final = LayerNorm(self.embeddings_size, bias=self.bias)  # final layer norm
         self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size, bias=False)
         if self.weigh_tying:
             self.token_embedding_table.weight = self.language_model_head.weight
@@ -225,7 +227,7 @@ class GPTLanguageModel(nn.Module):
         # apply multiple transformer blocks
         x = self.transformer_blocks(x)  # (B, T, C)
         # apply final normalization and generate logits for each token in vocabulary
-        x = self.layer_norm(x)  # (B, T, C)
+        x = self.layer_norm_final(x)  # (B, T, C)
 
         # during inference we don't need to encode all token predictions,
         # only the last one (newly generated)
@@ -257,6 +259,113 @@ class GPTLanguageModel(nn.Module):
             logits.view(B * T, C),
             targets.view(B * T),
         )
+
+    @classmethod
+    def from_pretrained(cls, gpt2_size):
+        # huggingface transformers library is needed only in this method
+        from transformers import GPT2Config, GPT2LMHeadModel
+
+        # check that the gpt2 size is supported
+        supported_sizes = ("gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl")
+        if gpt2_size not in supported_sizes:
+            msg = f"Only '{supported_sizes}' are supported, but '{gpt2_size}' was provided."
+            logger.error(msg)
+            raise ValueError(msg)
+
+        gpt2_hf_config = GPT2Config.get_config_dict(gpt2_size)[0]
+        # syncing argument names between our GPT implementation and from Huggingface
+        gpt_config = {
+            "vocab_size": gpt2_hf_config["vocab_size"],
+            "embeddings_size": gpt2_hf_config["n_embd"],
+            "context_size": gpt2_hf_config["n_ctx"],
+            "num_layers": gpt2_hf_config["n_layer"],
+            "num_heads": gpt2_hf_config["n_head"],
+            "bias": True,
+        }
+
+        dropout_set = {value for name, value in gpt2_hf_config.items() if "dropout" in name}
+        if len(dropout_set) != 1:
+            msg = "All dropouts for GPT2 model should have had the same value, "
+            f"but in fact recieved '{dropout_set}'"
+            logger.error(msg)
+            raise ValueError(msg)
+        gpt_config["dropout"] = list(dropout_set)[0]
+        gpt_config["head_size"] = None
+        gpt_config["feed_forward_scaling"] = 4
+
+        logger.debug("Creating GPT model with parameters: {}".format(gpt_config))
+        model = GPTLanguageModel(**gpt_config)
+        logger.debug("Model is created.")
+
+        # extract gpt model parameters into a variable
+        gpt_state_dict = model.state_dict()
+        # drop tril as it's a buffer (doesn't learn anything)
+        gpt_state_dict_keys = [k for k in gpt_state_dict.keys() if not k.endswith(".self_attention.tril")]
+
+        # create Huggingface pretrained GPT2 model
+        logger.debug("Loading pretrained Huggingface model of size '{}' ...".format(gpt2_size))
+        gpt2_hf_model = GPT2LMHeadModel.from_pretrained(gpt2_size)
+        logger.debug("Huggingface model is loaded.")
+        gpt2_hf_state_dict = gpt2_hf_model.state_dict()
+        # skip bias as it's not a parameter
+        gpt2_hf_state_dict_keys = [
+            key
+            for key in gpt2_hf_state_dict.keys()
+            if not key.endswith(
+                (
+                    ".attn.bias",
+                    ".attn.masked_bias",
+                )
+            )
+        ]
+
+        if len(gpt_state_dict_keys) != len(gpt2_hf_state_dict_keys):
+            msg = f"Mismatch number of keys between: {len(gpt_state_dict_keys)} != {len(gpt2_hf_state_dict_keys)}"
+            logger.error(msg)
+            raise ValueError(msg)
+
+        # since names of layers are different for our implementation and the one from Huggingface,
+        # we need to map them properly
+        param_mapping = {
+            "transformer": "",
+            "wte": "token_embedding_table",
+            "wpe": "positional_embedding_table",
+            "h": "transformer_blocks",
+            "attn": "self_attention",
+            "c_attn": "causal_self_attention",
+            "ln_1": "layer_norm_1",
+            "ln_2": "layer_norm_2",
+            "c_proj": "projection",
+            "mlp": "feed_forward",
+            "ln_f": "layer_norm_final",
+            "lm_head": "language_model_head",
+        }
+
+        def sync_name(name):
+            names_renamed = [param_mapping.get(n, n) for n in name.split(".")]
+            return ".".join(filter(None, names_renamed))
+
+        # in Huggingface implementation attention and feed forward uses 'Conv1D', while in this implementation,
+        # that means that we can use weights for those layers, only we need to transpose them
+        to_transposed = ("attn.c_attn.weight", "attn.c_proj.weight", "mlp.c_fc.weight", "mlp.c_proj.weight")
+
+        # loading weights
+        logger.debug("Starting copying weights from pretrained Huggingface model into our implementation ...")
+        # TODO: rename source and destination
+        for key in gpt2_hf_state_dict_keys:
+            key_dst = sync_name(key)
+            src_weights = gpt2_hf_state_dict[key]
+            if key.endswith(to_transposed):
+                src_weights = src_weights.t()
+            if src_weights.shape != gpt_state_dict[key_dst].shape:
+                msg = f"Shape mismatch: shape of source '{src_weights.shape}' and destinatiion - '{gpt_state_dict[key_dst].shape}'"
+                logger.error(msg)
+                raise ValueError(msg)
+            with torch.no_grad():
+                gpt_state_dict[key_dst].copy_(src_weights)
+        logger.debug("Weights are copied.")
+
+        return model
 
     @torch.no_grad()
     def generate(
@@ -292,7 +401,7 @@ class GPTLanguageModel(nn.Module):
             tensor containing indices of the provided characters and newly generated
         """
         # idx is (B, T) array of indices in the current context
-        for _ in range(max_new_tokens):
+        for _ in trange(max_new_tokens, ascii=True):
             # crop idx to the last block_size items
             context = idx[:, -self.context_size :]
             # get the predictions
