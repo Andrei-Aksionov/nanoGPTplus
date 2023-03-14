@@ -27,8 +27,9 @@ black = {version = "*", extras = ["jupyter"]}
 darglint = "~1.8.1"
 ipywidgets = "~8.0.4"
 pre-commit = "~3.0.4"
-ruff = "0.0.254"
+ruff = "0.0.255"
 
+# ---------------------------------------------- Tests -----------------------------------------------
 [tool.poetry.group.test.dependencies]
 pytest = "~7.2.2"
 pytest-order = "~1.0.1"
@@ -42,6 +43,7 @@ markers = [
 python_files = "*_test.py"
 testpaths = ["tests"]
 
+# -------------------------------------- Linting and Formatting --------------------------------------
 [tool.ruff]
 ignore = [
   "ANN002", # Missing type annotation for *_
