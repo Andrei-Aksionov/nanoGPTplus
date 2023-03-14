@@ -2,6 +2,7 @@ import argparse
 from time import perf_counter
 from typing import Optional
 
+import tiktoken
 import torch
 from loguru import logger
 
@@ -13,6 +14,7 @@ from src.utils import (
     get_model_config,
     grab_arguments,
     load_checkpoint,
+    log_error,
     pickle_load,
     set_seed,
 )
@@ -21,7 +23,8 @@ from src.utils import (
 def generate_new_tokens(
     model_class: torch.nn.Module,
     device: Optional[str],
-    size: str,
+    size: Optional[str],
+    gpt2_config: Optional[str],
     max_new_tokens: int,
     temperature: float,
     fix_seed: bool,
@@ -36,9 +39,11 @@ def generate_new_tokens(
         and weights should be stored in the folder that is specified in the config file
     device : Optional[str]
         on which device to run token generation
-    size : str
+    size : Optional[str]
         the size of the model (small or large). Corresponding weights should exist in the folder
         that is specified in the config file
+    gpt2_config: Optional[str]
+        weights from this config will be loaded from huggingface.
     max_new_tokens : int
         how many tokens to generate
     temperature: float
@@ -58,19 +63,37 @@ def generate_new_tokens(
 
     # get device and model's config
     device = device or get_device()
-    model_config = get_model_config(model_class, config, size)
 
-    # load tokenizer and pre-trained models
-    tokenizer = pickle_load(model_config.tokenizer_path)
-    model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
-    load_checkpoint(model_config.checkpoint_model_path, model)
+    # Bigram should have size, GPT - either size of gpt2_config, not both
+    if model_class == BigramLanguageModel and size is None:
+        log_error("For Bigram language model size has to be provided")
+    if model_class == GPTLanguageModel:
+        if not size and not gpt2_config:
+            log_error("For GPT language model either size or gpt2_config has to be provided, but both are empty.")
+        elif size and gpt2_config:
+            log_error(
+                "For GPT language model either size or gpt2_config has to be provided, not both, "
+                f"but was provided size={size} and gpt2_config={gpt2_config}"
+            )
+
+    # if all checks are passed, that means that either size of gpt2_config is provided
+    if size is not None:
+        model_config = get_model_config(model_class, config, size)
+        # load tokenizer and pre-trained models
+        tokenizer = pickle_load(model_config.tokenizer_path)
+        model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+        load_checkpoint(model_config.checkpoint_model_path, model)
+    else:
+        tokenizer = tiktoken.get_encoding("gpt2")
+        model = GPTLanguageModel.from_pretrained(gpt2_config)
     model.to(device)
+    model.eval()
 
     # generate tokens
     start_time = perf_counter()
     logger.debug("Generating tokens on '{}' device".format(device))
     tokens = tokenizer.encode(continue_tokens)
-    context = torch.tensor(tokens, device=device).unsqueeze(dim=0)
+    context = torch.tensor(tokens, device=device)[None, ...]
     new_tokens = tokenizer.decode(
         model.generate(
             context,
@@ -85,6 +108,7 @@ def generate_new_tokens(
 
 
 def main() -> None:
+    # flake8: noqa
     """Generate new tokens from either GPT or a simple bigram language model."""
     parser = argparse.ArgumentParser(description="Generate new tokens")
     models = {"bigram": BigramLanguageModel, "gpt": GPTLanguageModel}
@@ -101,6 +125,15 @@ def main() -> None:
         "-s",
         choices=["small", "medium", "large"],
         help="The size of the model (small or large)",
+        required=False,
+        type=str,
+    )
+    parser.add_argument(
+        "--gpt2-config",
+        choices=["gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"],
+        help="GPT2 config with pretrained weights",
+        required=False,
+        type=str,
     )
     parser.add_argument(
         "--device",
