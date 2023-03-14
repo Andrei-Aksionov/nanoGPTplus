@@ -6,10 +6,9 @@ import torch
 import torch.nn.functional as F
 from loguru import logger
 from torch import Tensor, nn
-from tqdm import tqdm, trange
+from tqdm import trange
 
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
-from src.utils.seed import set_seed
 
 
 class GPTLanguageModel(nn.Module):
@@ -124,7 +123,7 @@ class GPTLanguageModel(nn.Module):
             params_count -= self.positional_embedding_table.weight.numel()
         return params_count
 
-    def __init_weights(self, module: "torch.nn.modules") -> None:
+    def __init_weights(self, module: torch.nn.modules) -> None:
         """Initialize Embedding and Linear layers with a smaller std.
 
         By default weights of Embedding layer are initialized from normal distribution
@@ -261,66 +260,86 @@ class GPTLanguageModel(nn.Module):
         )
 
     @classmethod
-    def from_pretrained(cls, gpt2_size):
+    def from_pretrained(cls: "GPTLanguageModel", gpt2_type: str) -> "GPTLanguageModel":
+        """Create GPT2 model with weights copied from Huggingface pretrained model.
+
+        Parameters
+        ----------
+        cls : GPTLanguageModel
+        gpt2_type : str
+            GPT2 type: gpt2, gpt2-medium, gpt2-large and gpt2-xl are supported
+
+        Returns
+        -------
+        GPTLanguageModel
+            a model with pretrained weights
+
+        Raises
+        ------
+        ValueError
+            provided gpt2 type is not in the list of supported types
+        ValueError
+            Huggingface GPT2 config has different values for dropout
+        ValueError
+            mismatch number of keys/parameters between GPT and Huggingface's GPT2
+        ValueError
+            mismatch shape of a parameter between GPT and Huggingface's GPT2
+        """
+        # Notation:
+        # target* | the model to which the weights are copied (this GPT implementation)
+        # source* | the model from which the weight are copied (Huggingface GPT2 implementation)
+
         # huggingface transformers library is needed only in this method
         from transformers import GPT2Config, GPT2LMHeadModel
 
-        # check that the gpt2 size is supported
-        supported_sizes = ("gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl")
-        if gpt2_size not in supported_sizes:
-            msg = f"Only '{supported_sizes}' are supported, but '{gpt2_size}' was provided."
+        # check that the gpt2 type is supported
+        supported_types = ("gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl")
+        if gpt2_type not in supported_types:
+            msg = f"Only '{supported_types}' are supported, but '{gpt2_type}' was provided."
             logger.error(msg)
             raise ValueError(msg)
 
-        gpt2_hf_config = GPT2Config.get_config_dict(gpt2_size)[0]
+        # prepare config that will be passed into our GPT implementation
+        source_config = GPT2Config.get_config_dict(gpt2_type)[0]
         # syncing argument names between our GPT implementation and from Huggingface
-        gpt_config = {
-            "vocab_size": gpt2_hf_config["vocab_size"],
-            "embeddings_size": gpt2_hf_config["n_embd"],
-            "context_size": gpt2_hf_config["n_ctx"],
-            "num_layers": gpt2_hf_config["n_layer"],
-            "num_heads": gpt2_hf_config["n_head"],
+        target_config = {
+            "vocab_size": source_config["vocab_size"],
+            "embeddings_size": source_config["n_embd"],
+            "context_size": source_config["n_ctx"],
+            "num_layers": source_config["n_layer"],
+            "num_heads": source_config["n_head"],
+            "head_size": None,
+            "feed_forward_scaling": 4,
             "bias": True,
         }
-
-        dropout_set = {value for name, value in gpt2_hf_config.items() if "dropout" in name}
-        if len(dropout_set) != 1:
-            msg = "All dropouts for GPT2 model should have had the same value, "
-            f"but in fact recieved '{dropout_set}'"
+        # Dropouts for embedding, attention, residual, and summary in Huggingface implementation have to be identical
+        dropouts = [(name, value) for name, value in source_config.items() if "dropout" in name]
+        if not all(dropouts[0][1] == x[1] for x in dropouts[1:]):
+            msg = f"All dropouts for GPT2 model should have had the same value, but in fact received '{dropouts}'"
             logger.error(msg)
             raise ValueError(msg)
-        gpt_config["dropout"] = list(dropout_set)[0]
-        gpt_config["head_size"] = None
-        gpt_config["feed_forward_scaling"] = 4
+        target_config["dropout"] = dropouts[0][1]
 
-        logger.debug("Creating GPT model with parameters: {}".format(gpt_config))
-        model = GPTLanguageModel(**gpt_config)
-        logger.debug("Model is created.")
-
+        # Instantiate GPT model and extract params
+        logger.debug("Creating GPT model with parameters: {}".format(target_config))
+        target_model = GPTLanguageModel(**target_config)
         # extract gpt model parameters into a variable
-        gpt_state_dict = model.state_dict()
+        target_state_dict = target_model.state_dict()
         # drop tril as it's a buffer (doesn't learn anything)
-        gpt_state_dict_keys = [k for k in gpt_state_dict.keys() if not k.endswith(".self_attention.tril")]
+        target_state_dict_keys = [k for k in target_state_dict if not k.endswith(".self_attention.tril")]
 
         # create Huggingface pretrained GPT2 model
-        logger.debug("Loading pretrained Huggingface model of size '{}' ...".format(gpt2_size))
-        gpt2_hf_model = GPT2LMHeadModel.from_pretrained(gpt2_size)
+        logger.debug("Loading pretrained Huggingface model of size '{}' ...".format(gpt2_type))
+        source_model = GPT2LMHeadModel.from_pretrained(gpt2_type)
         logger.debug("Huggingface model is loaded.")
-        gpt2_hf_state_dict = gpt2_hf_model.state_dict()
+        source_state_dict = source_model.state_dict()
         # skip bias as it's not a parameter
-        gpt2_hf_state_dict_keys = [
-            key
-            for key in gpt2_hf_state_dict.keys()
-            if not key.endswith(
-                (
-                    ".attn.bias",
-                    ".attn.masked_bias",
-                )
-            )
+        source_state_dict_keys = [
+            key for key in source_state_dict if not key.endswith((".attn.bias", ".attn.masked_bias"))
         ]
 
-        if len(gpt_state_dict_keys) != len(gpt2_hf_state_dict_keys):
-            msg = f"Mismatch number of keys between: {len(gpt_state_dict_keys)} != {len(gpt2_hf_state_dict_keys)}"
+        if len(target_state_dict_keys) != len(source_state_dict_keys):
+            msg = f"Mismatch number of keys between: {len(target_state_dict_keys)} != {len(source_state_dict_keys)}"
             logger.error(msg)
             raise ValueError(msg)
 
@@ -341,31 +360,33 @@ class GPTLanguageModel(nn.Module):
             "lm_head": "language_model_head",
         }
 
-        def sync_name(name):
+        def sync_name(name: str) -> str:
             names_renamed = [param_mapping.get(n, n) for n in name.split(".")]
             return ".".join(filter(None, names_renamed))
 
-        # in Huggingface implementation attention and feed forward uses 'Conv1D', while in this implementation,
-        # that means that we can use weights for those layers, only we need to transpose them
+        # in Huggingface implementation attention and feed forward use 'Conv1D',
+        # while in this implementation - LinearLayer
+        # that means that we can use weights for those layers, only we need to transpose them before copying
         to_transposed = ("attn.c_attn.weight", "attn.c_proj.weight", "mlp.c_fc.weight", "mlp.c_proj.weight")
 
         # loading weights
         logger.debug("Starting copying weights from pretrained Huggingface model into our implementation ...")
-        # TODO: rename source and destination
-        for key in gpt2_hf_state_dict_keys:
-            key_dst = sync_name(key)
-            src_weights = gpt2_hf_state_dict[key]
-            if key.endswith(to_transposed):
-                src_weights = src_weights.t()
-            if src_weights.shape != gpt_state_dict[key_dst].shape:
-                msg = f"Shape mismatch: shape of source '{src_weights.shape}' and destinatiion - '{gpt_state_dict[key_dst].shape}'"
+        for source_key in source_state_dict_keys:
+            # map param name from Hugginface notation to this implementation's notation
+            target_key = sync_name(source_key)
+            source_weights = source_state_dict[source_key]
+            if source_key.endswith(to_transposed):
+                source_weights = source_weights.t()
+            if source_weights.shape != target_state_dict[target_key].shape:
+                msg = f"Shape mismatch: shape of source '{source_weights.shape}' and destination - "
+                "'{target_state_dict[target_key].shape}'"
                 logger.error(msg)
                 raise ValueError(msg)
             with torch.no_grad():
-                gpt_state_dict[key_dst].copy_(src_weights)
+                target_state_dict[target_key].copy_(source_weights)
         logger.debug("Weights are copied.")
 
-        return model
+        return target_model
 
     @torch.no_grad()
     def generate(
