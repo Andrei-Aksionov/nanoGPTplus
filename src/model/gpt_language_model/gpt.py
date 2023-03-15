@@ -266,7 +266,6 @@ class GPTLanguageModel(nn.Module):
 
         Parameters
         ----------
-        cls : GPTLanguageModel
         gpt2_type : str
             GPT2 type: gpt2, gpt2-medium, gpt2-large and gpt2-xl are supported
 
