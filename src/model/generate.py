@@ -115,7 +115,7 @@ def main() -> None:
     main_parser = argparse.ArgumentParser(description="Generate new tokens")
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
-    # ---------- common arguments ----------
+    # ---------- shared arguments ----------
     shared_parser.add_argument(
         "--device",
         help="Optionally you can select device on which the model will be trained",
