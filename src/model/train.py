@@ -158,37 +158,51 @@ def train(
 
 def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
-    parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
-    models = {"bigram": BigramLanguageModel, "gpt": GPTLanguageModel}
-    parser.add_argument(
-        "--model",
-        "-m",
-        choices=list(models),
-        help="Bigram or GPT",
-        required=True,
-        type=str,
-    )
-    parser.add_argument(
-        "--size",
-        "-s",
-        choices=["small", "medium", "large"],
-        help="The size of the model (small or large)",
-    )
-    parser.add_argument(
+    # main parser will store subparsers, shared parser - arguments that are shared between subparsers
+    main_parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
+    shared_parser = argparse.ArgumentParser(add_help=False)
+    # ordering matters: first shared arguments, then - subparsers
+    # ---------- shared arguments ----------
+    shared_parser.add_argument(
         "--device",
         help="Optionally you can select device on which the model will be trained",
         required=False,
         type=str,
     )
-    parser.add_argument(
+    shared_parser.add_argument(
         "--dataset-fraction",
         choices=RangeChecker(0, 1, inclusive_start=False),
         help="For debugging purpose you can run training only on a fraction of the dataset",
         required=False,
         type=float,
     )
-    args = vars(parser.parse_args())
-    model_name = models[args.pop("model")]
+    # ---------- subparsers ----------
+    subparsers = main_parser.add_subparsers(dest="model")
+    # bigram subparser
+    bigram_subparser = subparsers.add_parser("bigram", parents=[shared_parser])
+    bigram_subparser.add_argument(
+        "--size",
+        "-s",
+        choices=["large"],
+        help="The size of the Bigram model",
+        required=True,
+        type=str,
+    )
+    # gpt subparser
+    gpt_subparser = subparsers.add_parser("gpt", parents=[shared_parser])
+    gpt_subparser.add_argument(
+        "--size",
+        "-s",
+        choices=["small", "medium", "large"],
+        help="The size of the GPT model",
+        required=True,
+        type=str,
+    )
+    args = vars(main_parser.parse_args())
+    model_name = {
+        "bigram": BigramLanguageModel,
+        "gpt": GPTLanguageModel,
+    }[args.pop("model")]
     train(model_name, **args)
 
 
