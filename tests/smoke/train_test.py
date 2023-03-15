@@ -13,8 +13,7 @@ class TestTraining:
         completed_process = subprocess.run(
             # fmt: off
             [
-                "python", "src/model/train.py",
-                "--model", "bigram",
+                "python", "src/model/train.py", "bigram",
                 "--size", model_size,
                 "--device", "cpu",
                 "--dataset-fraction", "0.001",
@@ -28,8 +27,7 @@ class TestTraining:
         completed_process = subprocess.run(
             # fmt: off
             [
-                "python", "src/model/train.py",
-                "--model", "gpt",
+                "python", "src/model/train.py", "gpt",
                 "--size", model_size,
                 "--device", "cpu",
                 "--dataset-fraction", "0.00001",

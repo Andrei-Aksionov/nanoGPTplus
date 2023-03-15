@@ -13,8 +13,7 @@ class TestTokenGeneration:
         completed_process = subprocess.run(
             # fmt: off
             [
-                "python", "src/model/generate.py",
-                "--model", "bigram",
+                "python", "src/model/generate.py", "bigram",
                 "--size", model_size,
                 "--device", "cpu",
                 "--max-new-tokens", "10",
@@ -32,8 +31,7 @@ class TestTokenGeneration:
         completed_process = subprocess.run(
             # fmt: off
             [
-                "python", "src/model/generate.py",
-                "--model", "gpt",
+                "python", "src/model/generate.py", "gpt",
                 "--size", model_size,
                 "--device", "cpu",
                 "--max-new-tokens", "10",
@@ -51,8 +49,7 @@ class TestTokenGeneration:
         completed_process = subprocess.run(
             # fmt: off
             [
-                "python", "src/model/generate.py",
-                "gpt",
+                "python", "src/model/generate.py", "gpt",
                 "--gpt2-config", model_type,
                 "--device", "cpu",
                 "--max-new-tokens", "10",
@@ -70,8 +67,7 @@ class TestTokenGeneration:
         completed_process = subprocess.run(
             # fmt: off
             [
-                "python", "src/model/generate.py",
-                "gpt",
+                "python", "src/model/generate.py", "gpt",
                 "--gpt2-config", model_type,
                 "--device", "cpu",
                 "--max-new-tokens", "10",

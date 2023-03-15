@@ -112,7 +112,8 @@ The purpose of it is to better understand how Transformer architecture works by 
     Also possible to load GPT2 pretrained weights into a model and generate new tokens. In order to do that instead of providing size of the model provide `--gpt2-config` argument:
 
     ```bash
-    python src/model/generate.py gpt --gpt2-config gpt2 --max-new-tokens --temperature 0.8 --continue-tokens "Hello world!"
+    python src/model/generate.py gpt --gpt2-config gpt2 --max-new-tokens 100 --temperature 0.8 --continue-tokens "Hello world"
+    ```
 
 ## Run tests
 
