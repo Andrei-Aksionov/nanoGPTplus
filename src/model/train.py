@@ -159,7 +159,10 @@ def train(
 def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
     # main parser will store subparsers, shared parser - arguments that are shared between subparsers
-    main_parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
+    main_parser = argparse.ArgumentParser(
+        description="Train bigram or GPT language model",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
     # ---------- shared arguments ----------
@@ -198,11 +201,22 @@ def main() -> None:
         required=True,
         type=str,
     )
+
+    # combining 'help' output from both argparsers
+    shared_parser_help = (
+        shared_parser.format_help().replace("optional arguments:", "").replace(shared_parser.format_usage(), "")
+    )
+    shared_parser_help = f"{' Arguments common to all sub-parsers '.center(100, '-')}{shared_parser_help}"
+    main_parser.epilog = shared_parser_help
+
+    # parser arguments
     args = vars(main_parser.parse_args())
     model_name = {
         "bigram": BigramLanguageModel,
         "gpt": GPTLanguageModel,
     }[args.pop("model")]
+
+    # run model training
     train(model_name, **args)
 
 

@@ -124,7 +124,10 @@ def generate_new_tokens(
 def main() -> None:
     """Generate new tokens from either GPT or a simple bigram language model."""
     # main parser will store subparsers, shared parser - arguments that are shared between subparsers
-    main_parser = argparse.ArgumentParser(description="Generate new tokens")
+    main_parser = argparse.ArgumentParser(
+        description="Generate new tokens with Bigram or GPT model",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
     # ---------- shared arguments ----------
@@ -163,7 +166,7 @@ def main() -> None:
         type=str,
     )
     # ---------- subparsers ----------
-    subparsers = main_parser.add_subparsers(dest="model")
+    subparsers = main_parser.add_subparsers(dest="model", description="Choose model type")
     # bigram subparser
     bigram_subparser = subparsers.add_parser("bigram", parents=[shared_parser])
     bigram_subparser.add_argument(
@@ -197,11 +200,21 @@ def main() -> None:
         action="store_true",
         required=False,
     )
+    # combining 'help' output from both argparsers
+    shared_parser_help = (
+        shared_parser.format_help().replace("optional arguments:", "").replace(shared_parser.format_usage(), "")
+    )
+    shared_parser_help = f"{' Arguments common to all sub-parsers '.center(100, '-')}{shared_parser_help}"
+    main_parser.epilog = shared_parser_help
+
+    # parser arguments
     args = vars(main_parser.parse_args())
     model_name = {
         "bigram": BigramLanguageModel,
         "gpt": GPTLanguageModel,
     }[args.pop("model")]
+
+    # run token generation
     generate_new_tokens(model_name, **args)
 
 
