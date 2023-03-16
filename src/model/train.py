@@ -12,7 +12,7 @@ from src import config
 from src.data import CharTokenizer, NextTokenDataset
 from src.model import (
     BigramLanguageModel,
-    CosineWarmupLRSchedular,
+    CosineWarmupLRScheduler,
     GPTLanguageModel,
     Trainer,
 )
@@ -135,7 +135,7 @@ def train(
     elif isinstance(lr_decay_iters, float):
         lr_decay_iters = int(len(train_dataloader) * lr_decay_iters)
     logger.debug("LR decay iters: {}".format(lr_decay_iters))
-    lr_schedular = CosineWarmupLRSchedular(
+    lr_scheduler = CosineWarmupLRScheduler(
         optimizer=optimizer,
         warmup_iters=warmup_iters,
         lr_decay_iters=lr_decay_iters,
@@ -147,7 +147,7 @@ def train(
         train_dataloader=train_dataloader,
         eval_dataloader=test_dataloader,
         device=device or get_device(),
-        lr_schedular=lr_schedular,
+        lr_scheduler=lr_scheduler,
         grad_accumulation_steps=model_config.grad_accumulation_steps,
         checkpoint_model_path=model_config.checkpoint_model_path,
         tqdm_update_interval=model_config.tqdm_update_interval,
@@ -159,7 +159,10 @@ def train(
 def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
     # main parser will store subparsers, shared parser - arguments that are shared between subparsers
-    main_parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
+    main_parser = argparse.ArgumentParser(
+        description="Train bigram or GPT language model",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
     # ---------- shared arguments ----------
@@ -198,11 +201,22 @@ def main() -> None:
         required=True,
         type=str,
     )
+
+    # combining 'help' output from both argparsers
+    shared_parser_help = (
+        shared_parser.format_help().replace("optional arguments:", "").replace(shared_parser.format_usage(), "")
+    )
+    shared_parser_help = f"{' Arguments common to all sub-parsers '.center(100, '-')}{shared_parser_help}"
+    main_parser.epilog = shared_parser_help
+
+    # parser arguments
     args = vars(main_parser.parse_args())
     model_name = {
         "bigram": BigramLanguageModel,
         "gpt": GPTLanguageModel,
     }[args.pop("model")]
+
+    # run model training
     train(model_name, **args)
 
 

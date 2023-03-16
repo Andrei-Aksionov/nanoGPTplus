@@ -26,6 +26,7 @@ def generate_new_tokens(
     gpt2_config: Optional[str] = None,
     device: Optional[str] = None,
     max_new_tokens: int = 100,
+    use_kv_cache: bool = False,
     temperature: float = 1.0,
     fix_seed: bool = False,
     continue_tokens: str = "",
@@ -43,9 +44,12 @@ def generate_new_tokens(
     gpt2_config: Optional[str], optional
         weights from this config will be loaded from huggingface, by default None
     device : Optional[str]
-        on which device to run token generation
+        on which device to run token generation, by default None
     max_new_tokens : int, optional
         how many tokens to generate, by default 100
+    use_kv_cache: bool
+        for speed up key-value cache can be use; should not be greater than context size with which model was trained,
+        by default False
     temperature: float, optional
         temperature >= 1.0 - smaller randomness (small variations), temperature < 1.0 - higher randomness,
         by default 1.0
@@ -53,7 +57,8 @@ def generate_new_tokens(
         might be useful for debugging to have the same output every time, if so, then set fix_seed=True,
         by default False
     continue_tokens: str, optional
-        new token should be generated as a continuation of tokens in 'continue_tokens' variable, by default ""
+        new token should be generated as a continuation of tokens in 'continue_tokens' variable,
+        by default ""
     """
     # set up logger to write also in a file
     logger.add(config.logs.generation, **config.logs.logger_kwargs)
@@ -67,8 +72,11 @@ def generate_new_tokens(
     device = device or get_device()
 
     # Bigram should have size, GPT - either size of gpt2_config, not both
-    if model_class == BigramLanguageModel and size is None:
-        log_error("For Bigram language model size has to be provided")
+    if model_class == BigramLanguageModel:
+        if size is None:
+            log_error("For Bigram language model size has to be provided")
+        if use_kv_cache:
+            log_error("Key-Value cache is only available for GPT models")
     if model_class == GPTLanguageModel:
         if not size and not gpt2_config:
             log_error("For GPT language model either size or gpt2_config has to be provided, but both are empty.")
@@ -94,17 +102,21 @@ def generate_new_tokens(
     # generate tokens
     start_time = perf_counter()
     logger.debug("Generating tokens on '{}' device".format(device))
-    tokens = tokenizer.encode(continue_tokens)
-    context = torch.tensor(tokens, device=device)[None, ...]
-    new_tokens = tokenizer.decode(
-        model.generate(
-            context,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-        )
-        .squeeze()
-        .tolist(),
+    # convert initial tokens (words or chars) into vocabulary indices
+    init_context = torch.tensor(tokenizer.encode(continue_tokens), device=device)[None, ...]
+    # use only those kwargs that are accepted by function
+    kwargs = grab_arguments(
+        func=model.generate,
+        kwargs={
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "use_kv_cache": use_kv_cache,
+        },
     )
+    # model returns indices of the dictionary
+    new_token_indices = model.generate(init_context, **kwargs).squeeze().tolist()
+    # now we need to convert those indices into tokens (words or chars)
+    new_tokens = tokenizer.decode(new_token_indices)
     logger.info("New generated tokens: {}".format(new_tokens))
     logger.debug("Token generation took: {:.4f} seconds".format(perf_counter() - start_time))
 
@@ -112,7 +124,10 @@ def generate_new_tokens(
 def main() -> None:
     """Generate new tokens from either GPT or a simple bigram language model."""
     # main parser will store subparsers, shared parser - arguments that are shared between subparsers
-    main_parser = argparse.ArgumentParser(description="Generate new tokens")
+    main_parser = argparse.ArgumentParser(
+        description="Generate new tokens with Bigram or GPT model",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
     # ---------- shared arguments ----------
@@ -151,7 +166,7 @@ def main() -> None:
         type=str,
     )
     # ---------- subparsers ----------
-    subparsers = main_parser.add_subparsers(dest="model")
+    subparsers = main_parser.add_subparsers(dest="model", description="Choose model type")
     # bigram subparser
     bigram_subparser = subparsers.add_parser("bigram", parents=[shared_parser])
     bigram_subparser.add_argument(
@@ -179,11 +194,27 @@ def main() -> None:
         required=False,
         type=str,
     )
+    gpt_subparser.add_argument(
+        "--use-kv-cache",
+        help="Use kv-value cache to speed up token generation",
+        action="store_true",
+        required=False,
+    )
+    # combining 'help' output from both argparsers
+    shared_parser_help = (
+        shared_parser.format_help().replace("optional arguments:", "").replace(shared_parser.format_usage(), "")
+    )
+    shared_parser_help = f"{' Arguments common to all sub-parsers '.center(100, '-')}{shared_parser_help}"
+    main_parser.epilog = shared_parser_help
+
+    # parser arguments
     args = vars(main_parser.parse_args())
     model_name = {
         "bigram": BigramLanguageModel,
         "gpt": GPTLanguageModel,
     }[args.pop("model")]
+
+    # run token generation
     generate_new_tokens(model_name, **args)
 
 

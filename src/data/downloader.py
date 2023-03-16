@@ -17,6 +17,11 @@ def download(config: DictConfig, *, override_if_exists: bool = True) -> Path:
     override_if_exists: bool
         if True will download even if file with such name already exists
 
+    Raises
+    ------
+    HTTPError
+        if there is an error during downloading the file
+
     Returns
     -------
     Path

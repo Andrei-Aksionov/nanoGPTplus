@@ -78,3 +78,23 @@ class TestTokenGeneration:
             # fmt: on
         )
         assert completed_process.returncode == 0
+
+    # testing key-value cache
+    @pytest.mark.smoke
+    @pytest.mark.parametrize("model_type", ["gpt2"])
+    def test_gpt2_pretrained_token_generation_fast_kv_cache(self, model_type: str) -> None:
+        completed_process = subprocess.run(
+            # fmt: off
+            [
+                "python", "src/model/generate.py", "gpt",
+                "--gpt2-config", model_type,
+                "--device", "cpu",
+                "--max-new-tokens", "10",
+                "--continue-tokens", "Hello world ",
+                "--temperature", "0.8",
+                "--fix-seed",
+                "--use-kv-cache",
+            ],
+            # fmt: on
+        )
+        assert completed_process.returncode == 0

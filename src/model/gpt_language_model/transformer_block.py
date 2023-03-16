@@ -107,7 +107,7 @@ class TransformerBlock(nn.Module):
         self.layer_norm_1 = LayerNorm(normalized_shape=self.embeddings_size, bias=self.bias)
         self.layer_norm_2 = LayerNorm(normalized_shape=self.embeddings_size, bias=self.bias)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: Optional[Tensor]) -> Tensor:
         """Apply transformer block with layer norm, self-attention and feed-forward.
 
         `+` sign is for residual connection (allows to build deeper neural nets)
@@ -116,6 +116,9 @@ class TransformerBlock(nn.Module):
         ----------
         x : Tensor
             input tensor of size (batch_size, time-steps, channels_num)
+        kv_cache: None | Tensor
+            key-value cache, but only if not None; if None - it means that it's disabled
+            contains cache for keys and value from all previous steps
 
         Returns
         -------
@@ -125,5 +128,6 @@ class TransformerBlock(nn.Module):
         """
         # + sign is used for residual connection
         # helps with gradient flow and allows to build deeper neural nets
-        x = x + self.self_attention(self.layer_norm_1(x))
-        return x + self.feed_forward(self.layer_norm_2(x))
+        out, kv_cache = self.self_attention(self.layer_norm_1(x), kv_cache)
+        x = x + out
+        return x + self.feed_forward(self.layer_norm_2(x)), kv_cache

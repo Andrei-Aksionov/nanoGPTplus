@@ -17,7 +17,7 @@ class Trainer:
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
         device: Union[None, str, torch.device],
-        lr_schedular: Optional[torch.optim.lr_scheduler.Optimizer] = None,
+        lr_scheduler: Optional[torch.optim.lr_scheduler.Optimizer] = None,
         loss: "torch.nn.modules" = None,
         grad_accumulation_steps: Optional[int] = None,
         clip_grad_norm: Optional[float] = 1.0,
@@ -70,7 +70,7 @@ class Trainer:
             self.model.to(self.device)
         else:
             self.device = next(model.parameters()).device
-        self.lr_schedular = lr_schedular
+        self.lr_scheduler = lr_scheduler
         # either model should contain the loss or the loss function has to be provided
         if loss:
             self.loss = loss
@@ -106,8 +106,8 @@ class Trainer:
             # do weight update only every n grad accumulation steps if provided or every step if not
             if not self.grad_accumulation_steps or idx % self.grad_accumulation_steps == 0:
                 self.optimizer.step()
-                if self.lr_schedular:
-                    self.lr_schedular.step(idx)
+                if self.lr_scheduler:
+                    self.lr_scheduler.step(idx)
                 self.optimizer.zero_grad(set_to_none=True)
         return loss
 

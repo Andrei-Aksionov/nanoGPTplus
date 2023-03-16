@@ -23,7 +23,7 @@ def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: Optional[List[st
         kwargs that are expected by the provided function
     """
     ignore_kwargs = set(["self"] + (ignore_kwargs or []))
-    expected_args = {kwarg for kwarg in inspect.getfullargspec(func).args if kwarg not in ignore_kwargs}
+    expected_args = {kwarg for kwarg in inspect.signature(func).parameters if kwarg not in ignore_kwargs}
 
     return {k: v for k, v in kwargs.items() if k in expected_args}
 
