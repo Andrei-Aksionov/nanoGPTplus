@@ -1,9 +1,10 @@
 import inspect
 from collections.abc import Callable
 from numbers import Number
+from typing import List, Optional
 
 
-def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list | None = None) -> dict:
+def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: Optional[List[str]] = None) -> dict:
     """Return dictionary only with arguments that the func expects.
 
     Parameters
@@ -13,7 +14,7 @@ def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list | None = No
         this helper function will grab only args that are expected
     kwargs : dict
         dictionary with keyword arguments
-    ignore_kwargs : list | None, optional
+    ignore_kwargs : Optional[List[str]], optional
         kwargs to ignore, by default None
 
     Returns
@@ -22,18 +23,18 @@ def grab_arguments(func: Callable, kwargs: dict, ignore_kwargs: list | None = No
         kwargs that are expected by the provided function
     """
     ignore_kwargs = set(["self"] + (ignore_kwargs or []))
-    expected_args = {kwarg for kwarg in inspect.getfullargspec(func).args if kwarg not in ignore_kwargs}
+    expected_args = {kwarg for kwarg in inspect.signature(func).parameters if kwarg not in ignore_kwargs}
 
     return {k: v for k, v in kwargs.items() if k in expected_args}
 
 
 class ArgumentSaverMixin:
-    def save_arguments(self, ignore: list[str] = None) -> None:
+    def save_arguments(self, ignore: Optional[List[str]] = None) -> None:
         """Save all provided arguments into __dict__ by setattr.
 
         Parameters
         ----------
-        ignore : list[str], optional
+        ignore : Optional[List[str]], optional
             list of arguments to ignore, by default None
         """
         ignore = set(["self"] + (ignore or []))
@@ -83,4 +84,10 @@ class RangeChecker:
         yield self
 
     def __str__(self) -> str:
-        return f"[{self.start},{self.end}]"
+        if self.inclusive_start and self.inclusive_end:
+            return f"[{self.start},{self.end}]"
+        if self.inclusive_start:
+            return f"[{self.start},{self.end})"
+        if self.inclusive_end:
+            return f"({self.start},{self.end}]"
+        return f"({self.start},{self.end})"

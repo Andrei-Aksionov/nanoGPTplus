@@ -1,6 +1,8 @@
 import argparse
 import inspect
+import multiprocessing
 from pathlib import Path
+from typing import Optional
 
 import torch
 from loguru import logger
@@ -8,14 +10,28 @@ from torch.utils.data import DataLoader
 
 from src import config
 from src.data import CharTokenizer, NextTokenDataset
-from src.model import BigramLanguageModel, GPTLanguageModel, Trainer
-from src.model.lr_schedulers import CosineWarmupLRScheduler
-from src.utils import get_device, grab_arguments, set_seed
-from src.utils.arguments import RangeChecker
-from src.utils.model import get_model_config, pickle_dump
+from src.model import (
+    BigramLanguageModel,
+    CosineWarmupLRScheduler,
+    GPTLanguageModel,
+    Trainer,
+)
+from src.utils import (
+    RangeChecker,
+    get_device,
+    get_model_config,
+    grab_arguments,
+    pickle_dump,
+    set_seed,
+)
 
 
-def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_fraction: float | None = None) -> None:
+def train(
+    model_class: torch.nn.Module,
+    device: Optional[str],
+    size: str,
+    dataset_fraction: Optional[float] = None,
+) -> None:
     """Train a language model.
 
     Performs 4 steps:
@@ -28,16 +44,20 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
     ----------
     model_class : torch.nn.Module
         what language model to use
-    device: str | None
+    device: Optional[str]
         on what device to train, if not provided will try to figure out what device to use such as:
         if gpu (cuda or mps) is available will use it, if not - cpu
     size: str
         a model has two configs: small and large. Small is used for debug purpose as it's fast
-    dataset_fraction: float | None
+    dataset_fraction: Optional[float]
         for debugging purposes one might want to run training only on a small fraction of a dataset
     """
+    # set up logger to write also in a file
+    logger.add(config.logs.training, **config.logs.logger_kwargs)
+
     # set seed for reproducibility
     set_seed(config.seed)
+    logger.debug("Random seed is fixed for training.")
 
     # assign model's config to a variable
     model_config = get_model_config(model_class, config, size)
@@ -66,16 +86,17 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
     test_split = int(len(data) * config.dataloader.test_split)
     train_data, test_data = data[:test_split], data[test_split:]
     # Step 3.2. Create data loaders
+    num_workers = min(multiprocessing.cpu_count(), config.dataloader.num_workers)
     train_dataloader = DataLoader(
         NextTokenDataset(train_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
-        num_workers=config.dataloader.num_workers,
+        num_workers=num_workers,
         shuffle=True,
     )
     test_dataloader = DataLoader(
         NextTokenDataset(test_data, model_config.context_size, dataset_fraction),
         batch_size=model_config.batch_size,
-        num_workers=config.dataloader.num_workers,
+        num_workers=num_workers,
         shuffle=False,
     )
     logger.info("Data loaders are prepared.")
@@ -99,15 +120,20 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
         **extra_args,
     )
     # Step 4.3 Configure LR schedular
-    if "warmup_iters" not in model_config or not model_config.warmup_iters:
+    # if warmup/lr_decay iters is None - set default
+    # if it's a float - use it as a portion
+    # else - use as is
+    warmup_iters = model_config.get("warmup_iters")
+    if warmup_iters is None:
         warmup_iters = int(len(train_dataloader) * 0.1)
-    else:
-        warmup_iters = model_config.warmup_iters
-    logger.debug("Warmup iters: {}".format(warmup_iters))
-    if "lr_decay_iters" not in model_config or not model_config.lr_decay_iters:
+    elif isinstance(warmup_iters, float):
+        warmup_iters = int(len(train_dataloader) * warmup_iters)
+    logger.debug("LR warmup iters: {}".format(warmup_iters))
+    lr_decay_iters = model_config.get("lr_decay_iters")
+    if lr_decay_iters is None:
         lr_decay_iters = int(len(train_dataloader) * 0.95)
-    else:
-        lr_decay_iters = model_config.lr_decay_iters
+    elif isinstance(lr_decay_iters, float):
+        lr_decay_iters = int(len(train_dataloader) * lr_decay_iters)
     logger.debug("LR decay iters: {}".format(lr_decay_iters))
     lr_scheduler = CosineWarmupLRScheduler(
         optimizer=optimizer,
@@ -132,37 +158,51 @@ def train(model_class: torch.nn.Module, device: str | None, size: str, dataset_f
 
 def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
-    parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
-    models = {"bigram": BigramLanguageModel, "gpt": GPTLanguageModel}
-    parser.add_argument(
-        "--model",
-        "-m",
-        choices=list(models),
-        help="Bigram or GPT",
-        required=True,
-        type=str,
-    )
-    parser.add_argument(
-        "--size",
-        "-s",
-        choices=["small", "medium", "large"],
-        help="The size of the model (small or large)",
-    )
-    parser.add_argument(
+    # main parser will store subparsers, shared parser - arguments that are shared between subparsers
+    main_parser = argparse.ArgumentParser(description="Train bigram or GPT language model")
+    shared_parser = argparse.ArgumentParser(add_help=False)
+    # ordering matters: first shared arguments, then - subparsers
+    # ---------- shared arguments ----------
+    shared_parser.add_argument(
         "--device",
         help="Optionally you can select device on which the model will be trained",
         required=False,
         type=str,
     )
-    parser.add_argument(
+    shared_parser.add_argument(
         "--dataset-fraction",
         choices=RangeChecker(0, 1, inclusive_start=False),
         help="For debugging purpose you can run training only on a fraction of the dataset",
         required=False,
         type=float,
     )
-    args = vars(parser.parse_args())
-    model_name = models[args.pop("model")]
+    # ---------- subparsers ----------
+    subparsers = main_parser.add_subparsers(dest="model")
+    # bigram subparser
+    bigram_subparser = subparsers.add_parser("bigram", parents=[shared_parser])
+    bigram_subparser.add_argument(
+        "--size",
+        "-s",
+        choices=["large"],
+        help="The size of the Bigram model",
+        required=True,
+        type=str,
+    )
+    # gpt subparser
+    gpt_subparser = subparsers.add_parser("gpt", parents=[shared_parser])
+    gpt_subparser.add_argument(
+        "--size",
+        "-s",
+        choices=["small", "medium", "large"],
+        help="The size of the GPT model",
+        required=True,
+        type=str,
+    )
+    args = vars(main_parser.parse_args())
+    model_name = {
+        "bigram": BigramLanguageModel,
+        "gpt": GPTLanguageModel,
+    }[args.pop("model")]
     train(model_name, **args)
 
 

@@ -1,8 +1,11 @@
 import math
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+
+from src.utils import log_error
 
 
 class SelfAttentionHead(nn.Module):
@@ -55,7 +58,7 @@ class SelfAttentionHead(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: Optional[Tensor]) -> Tensor:
         """Forward method for Self-Attention.
 
         Self-attention does these 6 steps:
@@ -138,7 +141,7 @@ class MultiHeadAttention(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: None | int,
+        head_size: Optional[int],
         num_heads: int,
         bias: bool,
         dropout: float,
@@ -159,7 +162,7 @@ class MultiHeadAttention(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : None | int
+        head_size : Optional[int]
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without remainder
@@ -181,9 +184,10 @@ class MultiHeadAttention(nn.Module):
 
         if not head_size:
             if embeddings_size % num_heads != 0:
-                msg = "Embeddings size should be divisible by number of heads without remainder, "
-                f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
-                raise ValueError(msg)
+                log_error(
+                    "Embeddings size should be divisible by number of heads without remainder, "
+                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
+                )
             head_size = embeddings_size // num_heads
 
         self.embeddings_size = embeddings_size
@@ -213,7 +217,7 @@ class MultiHeadAttention(nn.Module):
         self.projection = nn.Linear(self.head_size * self.num_heads, self.embeddings_size, bias=self.bias)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: Optional[Tensor]) -> Tensor:
         """Apply multiple self-attention heads in parallel and concatenate the result.
 
         Parameters
@@ -272,7 +276,7 @@ class CausalSelfAttention(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: None | int,
+        head_size: Optional[int],
         num_heads: int,
         bias: bool,
         dropout: float,
@@ -291,7 +295,7 @@ class CausalSelfAttention(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : None | int
+        head_size : Optional[int]
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without remainder
@@ -313,9 +317,10 @@ class CausalSelfAttention(nn.Module):
 
         if not head_size:
             if embeddings_size % num_heads != 0:
-                msg = "Embeddings size should be divisible by the number of heads without a residual, "
-                f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
-                raise ValueError(msg)
+                log_error(
+                    "Embeddings size should be divisible by the number of heads without a residual, "
+                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
+                )
             head_size = embeddings_size // num_heads
 
         self.embeddings_size = embeddings_size
@@ -337,7 +342,7 @@ class CausalSelfAttention(nn.Module):
         if self.is_decoder:
             self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
 
-    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: Optional[Tensor]) -> Tensor:
         """Do multi-head attention in a single pass.
 
         Multiply by weight matrix -> split the result into query, key and value -> reshape each one of them
@@ -348,7 +353,7 @@ class CausalSelfAttention(nn.Module):
         ----------
         x : Tensor
             input tensor of shape (batch, time-step, embedding size)
-        kv_cache: None | Tensor
+        kv_cache: Optional[Tensor]
             key-value cache, but only if not None; if None - it means that it's disabled;
             contains cache for keys and value from all previous steps
 

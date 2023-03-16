@@ -22,16 +22,26 @@ model:
   bigram:
     size:
       large:
-        batch_size: 32
         context_size: 8 # what is the maximum number of tokens to use during forward pass
-        epochs: 1
+        batch_size: 32
+        # optimizer
         learning_rate: 1e-2
+        weight_decay: 1e-1
+        betas:
+          - 0.9
+          - 0.99
+        # lr schedular
+        warmup_iters: 0.0
+        lr_decay_iters: 1.0
+        grad_accumulation_steps: 1
+        epochs: 1
+        tqdm_update_interval: 100
         checkpoint_model_path: ${model.checkpoint_folder}/bigram_model.pth.tar
         tokenizer_path: ${model.tokenizer_folder}/tokenizer_bigram.pkl
   gpt:
     size:
       large:
-        embeddings_size: 512
+        embeddings_size: 516
         context_size: 384
         head_size: null # either should be provided explicitly or calculated implicitly as embeddings_size // num_heads
         num_heads: 12
@@ -78,8 +88,8 @@ model:
         grad_accumulation_steps: null
         epochs: 1
         tqdm_update_interval: 1
-        checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
-        tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_small.pkl
+        checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_medium.pth.tar
+        tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_medium.pkl
       small:
         embeddings_size: 128
         context_size: 64
@@ -105,3 +115,10 @@ model:
         tqdm_update_interval: 10
         checkpoint_model_path: ${model.checkpoint_folder}/gpt_model_small.pth.tar
         tokenizer_path: ${model.tokenizer_folder}/tokenizer_gpt_small.pkl
+
+logs:
+  folder: logs
+  logger_kwargs:
+    rotation: 50 MB
+  training: ${logs.folder}/training.log
+  generation: ${logs.folder}/generation.log

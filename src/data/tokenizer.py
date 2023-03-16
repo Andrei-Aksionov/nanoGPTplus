@@ -1,5 +1,8 @@
+from typing import List, Optional
+
+
 class CharTokenizer:
-    def __init__(self, vocab: list[str] | None = None, corpus: str | None = None) -> None:
+    def __init__(self, vocab: Optional[List[str]] = None, corpus: Optional[str] = None) -> None:
         """Create tokenizer.
 
         If vocab is not provided it will generate vocab from the corpus.
@@ -7,9 +10,9 @@ class CharTokenizer:
 
         Parameters
         ----------
-        vocab : list[str], optional
+        vocab : Optional[list[str]], optional
             list of unique tokens (chars, words, sub-words, ...), by default None
-        corpus : str, optional
+        corpus : Optional[str], optional
             the whole text on which model will be trained, required to generate vocabulary if not provided,
             by default None
 
@@ -29,7 +32,7 @@ class CharTokenizer:
         self.stoi = {char: idx for idx, char in enumerate(self.vocab)}
         self.itos = {idx: char for idx, char in enumerate(self.vocab)}
 
-    def encode(self, text: str) -> list[int]:
+    def encode(self, text: str) -> List[int]:
         """Encode text input into corresponding list of indices from char->idx map.
 
         Parameters
@@ -44,12 +47,12 @@ class CharTokenizer:
         """
         return [self.stoi[ch] for ch in text]
 
-    def decode(self, indices: list[int]) -> str:
+    def decode(self, indices: List[int]) -> str:
         """Decode list of indices into a string.
 
         Parameters
         ----------
-        indices : list[int]
+        indices : List[int]
             each integer corresponds to the index in the vocabulary
 
         Returns

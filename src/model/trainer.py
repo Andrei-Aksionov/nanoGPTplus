@@ -1,10 +1,12 @@
+from typing import List, Optional, Union
+
 import torch
 from loguru import logger
 from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.utils.model import save_checkpoint
+from src.utils import save_checkpoint
 
 
 class Trainer:
@@ -14,11 +16,11 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         train_dataloader: DataLoader,
         eval_dataloader: DataLoader,
-        device: None | str | torch.device,
-        lr_scheduler: None | torch.optim.lr_scheduler.Optimizer = None,
+        device: Union[None, str, torch.device],
+        lr_scheduler: Optional[torch.optim.lr_scheduler.Optimizer] = None,
         loss: "torch.nn.modules" = None,
-        grad_accumulation_steps: None | int = None,
-        clip_grad_norm: None | float = 1.0,
+        grad_accumulation_steps: Optional[int] = None,
+        clip_grad_norm: Optional[float] = 1.0,
         checkpoint_model_path: str = "models/model.pth.tar",
         tqdm_update_interval: int = 100,
     ) -> None:
@@ -34,16 +36,16 @@ class Trainer:
             dataloader containing data for training
         eval_dataloader : DataLoader
             dataloader containing data for evaluation
-        device: None | str | torch.device
+        device: Union[None, str, torch.device]
             where the model and batch should be stored and executed
             if device is None, batch will be moved to the same device where the model is
-        lr_scheduler: None | torch.optim.lr_scheduler.Optimizer
-            learning rate scheduler, by default None
+        lr_schedular: Optional[torch.optim.lr_schedular.Optimizer]
+            learning rate schedular, by default None
         loss : torch.nn.modules, optional
             function to measure correctness of predictions, if not provided the model should contain it, by default None
         grad_accumulation_steps: None | int
             if provided gradients will be zeroed every n steps
-        clip_grad_norm: None | float
+        clip_grad_norm: Optional[float]
             clips gradient norm of an iterable of parameters. The norm is computed over all gradients together, as if
             they were concatenated into a single vector. Gradients are modified in-place, by default 1.0
         checkpoint_model_path : str, optional
@@ -81,14 +83,14 @@ class Trainer:
         self.tqdm_update_interval = tqdm_update_interval
         self.checkpoint_model_path = checkpoint_model_path
 
-    def __move_batch_to(self, batch: list[Tensor, Tensor]) -> list[Tensor, Tensor]:
+    def __move_batch_to(self, batch: List[Tensor]) -> List[Tensor]:
         return [x.to(self.device) for x in batch]
 
     def _train_step(
         self,
         mode: str,
         idx: int,
-        batch: tuple | list,
+        batch: Union[tuple, list],
     ) -> Tensor:
         # data should be on the same device as the model
         inputs, targets = self.__move_batch_to(batch)

@@ -1,7 +1,13 @@
+
 <p>
     <h2 align="center">Welcome to NanoGPT+ in PyTorch</h2>
     <h5 align="center">Knock-off edition (but with enchantments)<h5>
 </p>
+
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
+[![test](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml/badge.svg)](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml)
 
 ***
 
@@ -47,6 +53,8 @@ The purpose of it is to better understand how Transformer architecture works by 
     - *train.py*: code to train language model
     - *trainer.py*: code to do all the necessary step for training and evaluating the model
   - **utils**: various utils files
+- **tests**
+  - **smoke**: include smoke tests for quick testing of repo functionality (download data, train and generate new tokens)
 - *pyproject.toml*: package dependencies are stored here and managed py [Poetry](https://python-poetry.org/)
 
 # How to use it
@@ -72,15 +80,15 @@ The purpose of it is to better understand how Transformer architecture works by 
 4. Run training via script:
 
     Train script accepts multiple arguments:
-    - Model name: `--model [bigram, gpt]` .
-    - Model size: `--size [small, large]` (small is good for debugging alongside with dataset fraction).
-    - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
-    - Dataset fraction: `--dataset-fraction` **[Optional]**: useful if one wants to quickly run training for debugging (affects both training and testing datasets). If not provided the whole dataset will be used.
+    - `[bigram, gpt]`: choose model type.
+    - `--size [small, medium, large]` (small is good for debugging alongside with dataset fraction). **Note**: for bigram model only large size is available
+    - `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
+    - `--dataset-fraction` **[Optional]**: useful if one wants to quickly run training for debugging (affects both training and testing datasets). If not provided the whole dataset will be used.
 
     **Arguments 1 and 2 are required.**
 
-    ```python
-    python src/model/train.py --model gpt --size large
+    ```bash
+    python src/model/train.py gpt --size large
     ```
 
     ... or in one of the example notebooks in `notebooks/examples/*_model_training.ipynb`.
@@ -88,17 +96,46 @@ The purpose of it is to better understand how Transformer architecture works by 
 5. Run new token generation:
 
     Generation script accepts multiple arguments:
-    - Model name: `--model [bigram, gpt]` .
-    - Model size: `--size [small, large]` (small is good for debugging).
-    - Device: `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
-    - Max new tokens: `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
-    - Fixed seed: `--fix-seed` **[Optional]**: if provided will fix to the seed specified in config file
-    - Key-value cache: `--use-kv-cache` **[Optional]**: if provided will use key-value cache for new tokens generation; if provided `--max-new-tokens` should not be greater than context_size of the model (one can check this parameter in the config file) plus initial context (`--continue-words`)
-    - Initial context: `--continue-words` **[Optional]**: if provided the model will generate new tokens that continue provided ones
+    - `[bigram, gpt]`: choose model type .
+    - `--size [small, medium, large]` (small is good for debugging). **Note**: for bigram model only large size is available
+    - `--gpt2-config [gpt2, gpt2-medium,  gpt2-large, gpt2-xl]`: load weights from pretrained model
+    - `--device [cpu, cuda, mps]` **[Optional]**: if not provided will try to detect automatically (GPU first and if it's not available - fallback to cpu).
+    - `--max-new-tokens` **[Optional]**: number of tokens to generate. If not provided the default value will be used, which is 100.
+    - `--temperature` **[Optional]**: if the value is above 1 - less randomness in token generation, if less then 1 - more randomness ([explained here](https://ai.stackexchange.com/questions/32477/what-is-the-temperature-in-the-gpt-models)). Usefull if you want to make token prediction more diverse, but the cost of it will be lower accuracy of generated tokens.
+    - `--fix-seed` **[Optional]**: if provided will fix to the seed specified in config file
+    - `--continue-words` **[Optional]**: if provided the model will generate new tokens that continue provided ones
 
-    ```python
-    python src/model/generate.py --model gpt --size large --max-new-tokens 100
+    ```bash
+    python src/model/generate.py gpt --size large --max-new-tokens 100
     ```
+
+    Also possible to load GPT2 pretrained weights into a model and generate new tokens. In order to do that instead of providing size of the model provide `--gpt2-config` argument:
+
+    ```bash
+    python src/model/generate.py gpt --gpt2-config gpt2 --max-new-tokens 100 --temperature 0.8 --continue-tokens "Hello world"
+    ```
+
+## Run tests
+
+[Pytest](https://github.com/pytest-dev/pytest) framework is used for tests execution so in order to run all tests simply type:
+
+```bash
+pytest
+```
+
+> **Note**: the command above will run all the tests.
+
+There are two types of tests: fast (smoke) and slow ones. Slow tests will load large size of GPT2 models. If one wants to run only fast test:
+
+```bash
+pytest -m smoke
+```
+
+If one wants to see also standard output in pytest logs (for example for tests of training):
+
+```bash
+pytest --include=sys
+```
 
 ***
 

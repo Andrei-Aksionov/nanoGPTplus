@@ -3,4 +3,5 @@ from src.model.gpt_language_model.attention import MultiHeadAttention, SelfAtten
 from src.model.gpt_language_model.feed_forward import FeedForward
 from src.model.gpt_language_model.gpt import GPTLanguageModel
 from src.model.gpt_language_model.transformer_block import TransformerBlock
+from src.model.lr_schedulers import CosineWarmupLRScheduler
 from src.model.trainer import Trainer

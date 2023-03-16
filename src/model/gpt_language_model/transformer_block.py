@@ -1,3 +1,5 @@
+from typing import List, Optional, Tuple, Union
+
 from torch import Tensor, nn
 
 from src.model.gpt_language_model.attention import (
@@ -8,12 +10,12 @@ from src.model.gpt_language_model.feed_forward import FeedForward
 
 
 class LayerNorm(nn.LayerNorm):
-    def __init__(self, normalized_shape: tuple[int] | list[int], bias: bool, **kwargs) -> None:
+    def __init__(self, normalized_shape: Union[Tuple[int], List[int]], bias: bool, **kwargs) -> None:
         """Wrap `torch.nn.LayerNorm` to have ability to disable bias.
 
         Parameters
         ----------
-        normalized_shape : tuple[int] | list[int]
+        normalized_shape : Union[Tuple[int], List[int]]
             number of features of the layer
         bias : bool
             whether to use bias or not
@@ -30,7 +32,7 @@ class TransformerBlock(nn.Module):
         self,
         embeddings_size: int,
         context_size: int,
-        head_size: None | int,
+        head_size: Optional[int],
         num_heads: int,
         bias: bool,
         dropout: float,
@@ -52,7 +54,7 @@ class TransformerBlock(nn.Module):
         context_size : int
             the number of tokens that will be used during calculation attention map and
             weighted averaging of value of each token
-        head_size : None | int
+        head_size : Optional[int]
             the size of output of self-attention;
             if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
             without residual
@@ -105,7 +107,7 @@ class TransformerBlock(nn.Module):
         self.layer_norm_1 = LayerNorm(normalized_shape=self.embeddings_size, bias=self.bias)
         self.layer_norm_2 = LayerNorm(normalized_shape=self.embeddings_size, bias=self.bias)
 
-    def forward(self, x: Tensor, kv_cache: None | Tensor) -> Tensor:
+    def forward(self, x: Tensor, kv_cache: Optional[Tensor]) -> Tensor:
         """Apply transformer block with layer norm, self-attention and feed-forward.
 
         `+` sign is for residual connection (allows to build deeper neural nets)
