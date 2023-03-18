@@ -115,17 +115,23 @@ The purpose of it is to better understand how Transformer architecture works by 
     python src/model/generate.py gpt --gpt2-config gpt2 --max-new-tokens 100 --temperature 0.8 --continue-tokens "Hello world"
     ```
 
-  5.1. Token generation with key-value cache
+6. Token generation with key-value cache
 
-  To speed up token generation you can use key-value cache. It helps to get rid of unnecessary calculations during sampling. With gpt2 pretrained weights the difference on CPU is 20 seconds without cache and 4 - with:
+    To speed up token generation you can use key-value cache. It helps to get rid of unnecessary calculations during sampling. With gpt2 pretrained weights the difference on CPU is 20 seconds without cache and 4 - with:
 
-  ```sh
-  python src/model/generate.py gpt --gpt2-config gpt2 --max-new-tokens 100 --temperature 0.8 --continue-tokens "Hello everyone, " --fix-seed --use-kv-cache
-  ```
+    ```sh
+    python src/model/generate.py gpt --gpt2-config gpt2 --max-new-tokens 100 --temperature 0.8 --continue-tokens "Hello everyone, " --fix-seed --use-kv-cache
+    ```
 
-  > **Note**: the number of new tokens + number of tokens in initial context (`--continue-tokens`) has to be lower or equal that the size of context of the model. For instance if to use model with context_size of 64, the value of `--max-new-tokens` plus len of string `--continue-tokens` has to be lower or equal to 64. If to use pretrained GPT2 weights than the context size is 1024 so you have a lot of room to breath. That's why I recommend to use kv-cache on only big models. For curious ones: this limitation happens because of the learnable positional embeddings. One might mitigate this limitation by implementing [other type](https://www.tensorflow.org/text/tutorials/transformer#the_embedding_and_positional_encoding_layer) of positional embeddings.
+    > **Note**: the number of new tokens + number of tokens in initial context (`--continue-tokens`) has to be lower or equal that the size of context of the model. For instance if to use model with context_size of 64, the value of `--max-new-tokens` plus len of string `--continue-tokens` has to be lower or equal to 64. If to use pretrained GPT2 weights than the context size is 1024 so you have a lot of room to breath. That's why I recommend to use kv-cache on only big models. For curious ones: this limitation happens because of the learnable positional embeddings. One might mitigate this limitation by implementing [other type](https://www.tensorflow.org/text/tutorials/transformer#the_embedding_and_positional_encoding_layer) of positional embeddings.
 
-  > **Note**: it's not fully deterministic. That means that the output with and without key-value cache might be different, even if provided '--fix-seed'. On cpu it might be not that noticeable (if at all), but on GPU (or with lower floating point precision) you can definatelly notice the difference. The output with kv-cache is not bad, just different. In my opinion the speed up is worth it, that's why it is widely adopted.
+    > **Note**: it's not fully deterministic. That means that the output with and without key-value cache might be different, even if provided '--fix-seed'. On cpu it might be not that noticeable (if at all), but on GPU (or with lower floating point precision) you can definatelly notice the difference. The output with kv-cache is not bad, just different. In my opinion the speed up is worth it, that's why it is widely adopted.
+
+    I also noticed a weird behavior with `mps` device on Macbook Pro 16 2019 model with AMD GPU when using key-value cache.
+
+7. Run in Google Colab
+
+    If you don't have a GPU in your posesson or just don't want to install the project on your local machine, you can simply click on `Open in Google Colab` badge in [`notebooks/examples/run_on_google_colab.ipynb`](notebooks/examples/run_on_google_colab.ipynb). The notebook contains examples of training Bigram and GPT models, sampling new tokens from them and also loading pretrained weights from OpenAI GPT2 model and sampling new tokens from it.
 
 ## Run tests
 
