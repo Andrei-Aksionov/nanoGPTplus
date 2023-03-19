@@ -402,6 +402,14 @@ class GPTLanguageModel(nn.Module):
                     f"'{target_state_dict[target_key].shape}'",
                 )
 
+            # TODO: investigate why CPU memory consumption is higher when the model is moved to GPU:
+            # empty weights for target_model allows to load bigger models, but after moving the model
+            # on GPU the system memory consumption is higher in comparison to not loading empty weights
+            # it is either fault of `setattr` or accelerate library
+            # NOTE: it's not a accelerate library fault
+
+            # when using tensor with empty weights (device="meta"), it's not that easy to copy
+            # source_weights, we have to assign them directly to the module
             source_weights = torch.nn.Parameter(source_weights, requires_grad=False)
             target_module = reduce(lambda module, key: getattr(module, key), target_key.split(".")[:-1], target_model)
             setattr(target_module, target_key.split(".")[-1], source_weights)
