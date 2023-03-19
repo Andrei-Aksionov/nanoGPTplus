@@ -13,6 +13,35 @@ files = [
 ]
 
 [[package]]
+name = "accelerate"
+version = "0.17.1"
+description = "Accelerate"
+category = "main"
+optional = false
+python-versions = ">=3.7.0"
+files = [
+    {file = "accelerate-0.17.1-py3-none-any.whl", hash = "sha256:4d1f049c32498694c764cfe657cb4ead523e0eda90ed95e21bb1806ac06ab80b"},
+    {file = "accelerate-0.17.1.tar.gz", hash = "sha256:f8ad36e1ce186960bb975bd1627dcb0962c2046658d3ec1617583ebdc598f599"},
+]
+
+[package.dependencies]
+numpy = ">=1.17"
+packaging = ">=20.0"
+psutil = "*"
+pyyaml = "*"
+torch = ">=1.4.0"
+
+[package.extras]
+dev = ["black (>=23.1,<24.0)", "datasets", "deepspeed", "evaluate", "hf-doc-builder (>=0.3.0)", "parameterized", "pytest", "pytest-subtests", "pytest-xdist", "rich", "ruff (>=0.0.241)", "scikit-learn", "scipy", "tqdm", "transformers"]
+quality = ["black (>=23.1,<24.0)", "hf-doc-builder (>=0.3.0)", "ruff (>=0.0.241)"]
+rich = ["rich"]
+sagemaker = ["sagemaker"]
+test-dev = ["datasets", "deepspeed", "evaluate", "scikit-learn", "scipy", "tqdm", "transformers"]
+test-prod = ["parameterized", "pytest", "pytest-subtests", "pytest-xdist"]
+test-trackers = ["comet-ml", "tensorboard", "wandb"]
+testing = ["datasets", "deepspeed", "evaluate", "parameterized", "pytest", "pytest-subtests", "pytest-xdist", "scikit-learn", "scipy", "tqdm", "transformers"]
+
+[[package]]
 name = "antlr4-python3-runtime"
 version = "4.9.3"
 description = "ANTLR 4.9.3 runtime for Python 3.7"
@@ -2756,4 +2785,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8.0"
-content-hash = "bc314c6da9a0a1c859373b8d9c8cfc5c9f5f88ed17b6f3ae84ead271d96d2b2f"
+content-hash = "23d555dbd5552fd89b642cffc609aedf2fbd83d66decdf6f33b68b00f6d50db2"

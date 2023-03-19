@@ -309,7 +309,8 @@ class GPTLanguageModel(nn.Module):
         # target* | the model to which the weights are copied (this GPT implementation)
         # source* | the model from which the weight are copied (Huggingface GPT2 implementation)
 
-        # huggingface transformers library is needed only in this method
+        # huggingface transformers and accelerate libraries are needed only in this method
+        from accelerate import init_empty_weights
         from transformers import GPT2Config, GPT2LMHeadModel
 
         # check that the gpt2 type is supported
@@ -338,7 +339,10 @@ class GPTLanguageModel(nn.Module):
 
         # Instantiate GPT model and extract params
         logger.debug("Creating GPT model with parameters: {}".format(target_config))
-        target_model = GPTLanguageModel(**target_config)
+        # load target model with empty weights, but keeps buffers
+        # also skips weight initialization in comparison to `...to(torch.device("meta"))`
+        with init_empty_weights(include_buffers=False):
+            target_model = GPTLanguageModel(**target_config)
         # extract gpt model parameters into a variable
         target_state_dict = target_model.state_dict()
         # drop tril as it's a buffer (doesn't learn anything)
@@ -385,6 +389,7 @@ class GPTLanguageModel(nn.Module):
 
         # loading weights
         logger.debug("Starting copying weights from pretrained Huggingface model into our implementation ...")
+
         for source_key in source_state_dict_keys:
             # map param name from Hugginface notation to this implementation's notation
             target_key = sync_name(source_key)
@@ -396,8 +401,11 @@ class GPTLanguageModel(nn.Module):
                     f"Shape mismatch: shape of source '{source_weights.shape}' and destination - "
                     f"'{target_state_dict[target_key].shape}'",
                 )
-            with torch.no_grad():
-                target_state_dict[target_key].copy_(source_weights)
+
+            source_weights = torch.nn.Parameter(source_weights, requires_grad=False)
+            target_module = reduce(lambda module, key: getattr(module, key), target_key.split(".")[:-1], target_model)
+            setattr(target_module, target_key.split(".")[-1], source_weights)
+
         logger.debug("Weights are copied.")
 
         return target_model
