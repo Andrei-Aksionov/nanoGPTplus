@@ -119,6 +119,8 @@ class GPTLanguageModel(nn.Module):
 
     def __get_parameters_number(self, exclude_positional_embeddings: bool = True) -> int:
         """Return total number of parameters of the model without counting parameters of positional embeddings."""
+        # TODO: when loading gpt2 weights the logging says that the number of parameters is ~162 million, when
+        # it needs to be ~124 million
         params_count = sum(param.numel() for param in self.parameters())
         if exclude_positional_embeddings:
             params_count -= self.positional_embedding_table.weight.numel()
@@ -413,6 +415,10 @@ class GPTLanguageModel(nn.Module):
             source_weights = torch.nn.Parameter(source_weights, requires_grad=False)
             target_module = reduce(lambda module, key: getattr(module, key), target_key.split(".")[:-1], target_model)
             setattr(target_module, target_key.split(".")[-1], source_weights)
+            # TODO: validate that it indeed deletes these values
+            # since we copied weights into target model, we don't need them anymore
+            del source_weights
+            del source_state_dict[source_key]
 
         logger.debug("Weights are copied.")
 
