@@ -118,6 +118,7 @@ class GPTLanguageModel(nn.Module):
         )
 
     def __get_parameters_number(self, exclude_positional_embeddings: bool = True) -> int:
+        # TODO: print total number of parameters and number of learnable parameters
         """Return total number of parameters of the model without counting parameters of positional embeddings."""
         params_count = sum(param.numel() for param in self.parameters())
         if exclude_positional_embeddings:
@@ -139,6 +140,8 @@ class GPTLanguageModel(nn.Module):
             module of the network
         """
         if isinstance(module, (nn.Embedding, nn.Linear)):
+            # TODO: check different std init works better
+            #   0.2 / sqrt ( 2 * number of transformer blocks)
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)

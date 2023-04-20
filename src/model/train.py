@@ -16,6 +16,7 @@ from src.model import (
     GPTLanguageModel,
     Trainer,
 )
+from src.model.gpt_language_model.lora import lora
 from src.utils import (
     RangeChecker,
     get_device,
@@ -104,7 +105,9 @@ def train(
     # Step 4: Train the model
     # Step 4.1. Create model
     logger.info("Staring training...")
-    model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+    # TODO: nut sure that this one works
+    with lora(r=2, alpha=3, dropout=0.0, enabled=True):
+        model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
     # Step 4.2. Configure optimizer
     optimizer_parameters = model.optimizer_parameters if hasattr(model, "optimizer_parameters") else model.parameters()
     # new PyTorch nightly has a new 'fused' option for AdamW that is much faster
@@ -119,6 +122,9 @@ def train(
         betas=model_config.betas,
         **extra_args,
     )
+    # TODO: this is a total mess
+    #   need to prettify it
+
     # Step 4.3 Configure LR schedular
     # if warmup/lr_decay iters is None - set default
     # if it's a float - use it as a portion
