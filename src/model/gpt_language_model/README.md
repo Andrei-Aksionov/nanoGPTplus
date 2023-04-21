@@ -1,6 +1,6 @@
 # Notes about Transformer architecture
 
-![transformer architecture](../../../references/transformer/transformer_architecture.png)
+![transformer architecture](../../../assets/transformer/transformer_architecture.png)
 
 pic 1: Transformer architecture[^1] (encoder on the left and decoder is on the right side).
 
@@ -11,7 +11,7 @@ Decoder consists of transformer blocks and each transformer block consists of tw
 1. Self-attention layer.
 2. Feed-forward layer.
 
-![transformer block](../../../references/transformer/transformer_block.png)
+![transformer block](../../../assets/transformer/transformer_block.png)
 
 pic 2: Transformer block[^1].
 

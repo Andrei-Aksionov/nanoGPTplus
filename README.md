@@ -1,12 +1,11 @@
 
 <p>
-    <h2 align="center">Welcome to NanoGPT+ in PyTorch</h2>
-    <h5 align="center">Knock-off edition (but with enchantments)<h5>
+    <h2 align="center">Welcome to NanoGPT+</h2>
+    <h4 align="center">Knock-off edition</h4>
+    <h6 align="center">but with enchantments</h6>
 </p>
 
-[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
-[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
+![Python versions](/assets/readme/python_versions.svg)
 [![test](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml/badge.svg)](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml)
 
 ***
@@ -17,7 +16,7 @@ The purpose of it is to better understand how Transformer architecture works by 
 
 > **Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) I haven't added GPU specific code, so if you have one (GPU or even a node) then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
 
-<p align=center><img src="references/readme/amazon_prime.jpg"></p>
+<p align=center><img src="assets/readme/amazon_prime.jpg"></p>
 
 # Project structure
 

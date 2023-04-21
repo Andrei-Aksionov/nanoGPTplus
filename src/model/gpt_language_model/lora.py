@@ -10,14 +10,15 @@
 import math
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from loguru import logger
 
 # import lit_llama.model as llama
-from src.model.gpt_language_model import attention
+from src.model.gpt_language_model import attention, transformer_block
 
 
 class LoRALayer:
@@ -202,18 +203,31 @@ class CausalSelfAttention(attention.CausalSelfAttention):
     lora_config = None
 
     # def __init__(self, config: llama.LLaMAConfig) -> None:
-    def __init__(self, config: dict) -> None:
+    # def __init__(self, config: dict) -> None:
+    def __init__(
+        self,
+        embeddings_size: int,
+        context_size: int,
+        head_size: Optional[int],
+        num_heads: int,
+        bias: bool,
+        dropout: float,
+        *,
+        is_decoder: bool,
+    ) -> None:
+        logger.debug("Using Causal Self Attention with LoRA")
         # Skip the parent class __init__ altogether and replace it to avoid
         # useless allocations
         nn.Module.__init__(self)
-        assert config.n_embd % config.n_head == 0
+        # assert config.n_embd % config.n_head == 0
+        assert embeddings_size % num_heads == 0
 
         # key, query, value projections for all heads, but in a batch
         # TODO: what makes MergedLinear an attention layer
         #   apparently it's because of inheritance
         self.c_attn = MergedLinear(
-            in_features=config.n_embd,
-            out_features=3 * config.n_embd,
+            in_features=embeddings_size,
+            out_features=3 * embeddings_size,
             r=self.lora_config.r,
             lora_alpha=self.lora_config.alpha,
             lora_dropout=self.lora_config.dropout,
@@ -223,13 +237,16 @@ class CausalSelfAttention(attention.CausalSelfAttention):
             bias=False,
         )
         # output projection
-        self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=False)
+        self.projection = nn.Linear(embeddings_size, embeddings_size, bias=False)
         # TODO: is it indeed regularization section?
         # regularization
-        self.n_head = config.n_head
-        self.n_embd = config.n_embd
-        self.block_size = config.block_size
-        self.rope_cache = None
+        self.num_heads = num_heads
+        self.embeddings_size = embeddings_size
+        self.context_size = context_size
+        self.head_size = head_size
+        self.bias = bias
+        self.dropout = dropout
+        self.is_decoder = is_decoder
 
 
 @contextmanager
@@ -245,6 +262,7 @@ def lora(r, alpha, dropout, enabled: bool = True):
     causal_self_attention = attention.CausalSelfAttention
     # replace original attention with LoRA variant
     attention.CausalSelfAttention = CausalSelfAttention
+    transformer_block.CausalSelfAttention = CausalSelfAttention
     yield
     # reset original attention
     attention.CausalSelfAttention = causal_self_attention
