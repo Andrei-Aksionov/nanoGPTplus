@@ -7,6 +7,34 @@
 # flake8: noqa
 # sourcery skip: default-mutable-arg, switch, remove-unnecessary-else
 
+"""
+            -----------------
+            |       h       |
+            -----------------
+                    ^
+                    |
+                    +
+                 /     \
+    ----------------    -----------          Matrix initialization:
+    |  pretrained  |     \       /           B = 0
+    |   weights    |      \  B  /            A = N(0, sigma^2)
+    |              |       -----
+    |  W e R^(dxd) |       | r |             r - rank
+    |              |       -----
+    ----------------      /  A  \
+            ^            /       \
+             \          -----------
+              \         ^
+               \       /
+            -----------------
+            |       x       |
+            -----------------
+
+    With LoRA (low ranking adaptation) instead of learning weights of size d*d, we can freeze the
+    pretrained weights and instead learn two matrices of size d*r and r*d: the number of parameters
+    in this case will be reduced dramatically (depending on the rank of course) yet after multiplication
+    of matrices d*r and r*d we will get a matrix d*d which we can sum with frozed pretrained weights and
+    thus finetune model.
 import math
 from contextlib import contextmanager
 from dataclasses import dataclass
