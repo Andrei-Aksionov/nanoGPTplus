@@ -16,7 +16,7 @@ from src.model import (
     GPTLanguageModel,
     Trainer,
 )
-from src.model.gpt_language_model.lora import lora
+from src.model.gpt_language_model.lora import lora, mark_only_lora_as_trainable
 from src.utils import (
     RangeChecker,
     get_device,
@@ -105,9 +105,12 @@ def train(
     # Step 4: Train the model
     # Step 4.1. Create model
     logger.info("Staring training...")
-    # TODO: nut sure that this one works
-    with lora(r=2, alpha=3, dropout=0.0, enabled=True):
-        model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+    if model_config.use_lora:
+        # TODO: LoRA parameters needs to be set in config file
+        with lora(r=2, alpha=3, dropout=0.0, enabled=model_config.use_lora):
+            model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+        mark_only_lora_as_trainable(model)
+
     # Step 4.2. Configure optimizer
     optimizer_parameters = model.optimizer_parameters if hasattr(model, "optimizer_parameters") else model.parameters()
     # new PyTorch nightly has a new 'fused' option for AdamW that is much faster

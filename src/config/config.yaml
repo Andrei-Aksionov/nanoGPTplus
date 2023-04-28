@@ -60,6 +60,8 @@ model:
         # lr schedular
         warmup_iters: null
         lr_decay_iters: null
+        # PEFT
+        use_lora: false
         grad_accumulation_steps: 5
         epochs: 1
         tqdm_update_interval: 1
@@ -85,6 +87,8 @@ model:
         # lr schedular
         warmup_iters: null
         lr_decay_iters: null
+        # PEFT
+        use_lora: false
         grad_accumulation_steps: null
         epochs: 1
         tqdm_update_interval: 1
@@ -110,6 +114,9 @@ model:
         # lr schedular
         warmup_iters: null
         lr_decay_iters: null
+        # PEFT
+        # TODO: for training from scratch it should be set as false
+        use_lora: true
         grad_accumulation_steps: null
         epochs: 1
         tqdm_update_interval: 10

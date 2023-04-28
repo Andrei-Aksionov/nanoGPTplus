@@ -8,6 +8,7 @@ from loguru import logger
 from torch import Tensor, nn
 from tqdm import trange
 
+from src.model.gpt_language_model.lora import MergedLinear
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
 from src.utils import log_error
 
@@ -240,7 +241,7 @@ class GPTLanguageModel(nn.Module):
         """
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay, no_decay = set(), set()
-        expected_weight_modules = (nn.Linear, nn.LayerNorm, LayerNorm, nn.Embedding)
+        expected_weight_modules = (nn.Linear, nn.LayerNorm, LayerNorm, nn.Embedding, MergedLinear)
         for pn, _ in self.named_parameters():
             # get the parent module by the parameter's name
             module = reduce(lambda module, key: getattr(module, key), pn.split(".")[:-1], self)
