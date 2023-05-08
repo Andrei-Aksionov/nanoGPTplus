@@ -16,7 +16,7 @@ from src.model import (
     GPTLanguageModel,
     Trainer,
 )
-from src.model.gpt_language_model.lora import lora, mark_only_lora_as_trainable
+from src.model.gpt_language_model.peft.lora import lora, mark_only_lora_as_trainable
 from src.utils import (
     RangeChecker,
     get_device,
@@ -27,7 +27,8 @@ from src.utils import (
 )
 
 
-def train(
+# TODO: perhaps it's about time to split this func into a set of smaller ones
+def train(  # noqa: PLR0915
     model_class: torch.nn.Module,
     device: Optional[str],
     size: str,
@@ -107,7 +108,9 @@ def train(
     logger.info("Staring training...")
     if model_config.use_lora:
         # TODO: LoRA parameters needs to be set in config file
-        with lora(r=2, alpha=3, dropout=0.0, enabled=model_config.use_lora):
+        # TODO: looks like r and alpha should be equal
+        # with lora(r=2, alpha=3, dropout=0.0, enabled=model_config.use_lora):
+        with lora(r=2, alpha=3, dropout=0.2, enabled=model_config.use_lora):
             model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
         mark_only_lora_as_trainable(model)
 
@@ -161,6 +164,8 @@ def train(
         checkpoint_model_path=model_config.checkpoint_model_path,
         tqdm_update_interval=model_config.tqdm_update_interval,
     )
+    # model.train()
+    # model.eval()
     trainer.train(epochs=model_config.epochs)
     logger.info("Training is finished")
 

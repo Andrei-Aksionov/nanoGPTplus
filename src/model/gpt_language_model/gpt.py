@@ -8,7 +8,7 @@ from loguru import logger
 from torch import Tensor, nn
 from tqdm import trange
 
-from src.model.gpt_language_model.lora import MergedLinear
+from src.model.gpt_language_model.peft.lora import MergedLinear
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
 from src.utils import log_error
 
