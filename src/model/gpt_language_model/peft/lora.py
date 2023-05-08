@@ -5,12 +5,8 @@
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 #  ------------------------------------------------------------------------------------------
 
-# flake8: noqa
-# sourcery skip: default-mutable-arg, switch, remove-unnecessary-else
-
-"""
-
-    Low Ranking Adaptation for LLMs scheme
+r"""
+    Low Ranking Adaptation for LLMs scheme.
 
             -----------------
             |       h       |
@@ -42,7 +38,7 @@
 
     The goal of this approach is to move weight updates into a separete matrix which is decomposed with
     two matrices of a lower rank.
-"""
+"""  # noqa: D208
 
 import math
 from contextlib import contextmanager
@@ -50,12 +46,13 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from loguru import logger
+from torch import nn
 
 from src.model.gpt_language_model import attention, transformer_block
-from src.utils.error import log_error
+
+# TODO: refactor original code in a way that it helps to get rid of noqa statements
 
 
 class LoRALayer:
@@ -65,8 +62,8 @@ class LoRALayer:
         lora_alpha: int,
         lora_dropout: float,
         merge_weights: bool,
-    ):
-        """Base class to store LoRA specific attributes.
+    ) -> None:
+        """Store LoRA specific attributes in a class.
 
         Parameters
         ----------
@@ -105,11 +102,11 @@ class MergedLinear(nn.Linear, LoRALayer):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        enable_lora: List[bool] = [False],
+        enable_lora: List[bool] = (False, False, False),
         fan_in_fan_out: bool = False,
         merge_weights: bool = True,
         **kwargs,
-    ):
+    ) -> None:
         """LoRA wrapper around linear class that is used for calculation q, k and v matrices.
 
         This class has three weight matrices:
@@ -134,9 +131,10 @@ class MergedLinear(nn.Linear, LoRALayer):
         lora_dropout : float
             dropout that is applied on the input in the LoRA branch (before multiplying by matrix A)
         enable_lora : List[bool], optional
-            MergeLinear class is for attention mechanism where qkv are calculated with a single weight matrix. If we don't
-            want to apply LoRA for all three (query, key and value) we can set it as False. For example if we want to apply
-            LoRA only to `query` and `value` but keep `key` without weight updates we should pass `[True, False, True]`
+            MergeLinear class is for attention mechanism where qkv are calculated with a single weight matrix. If we
+            don't want to apply LoRA for all three (query, key and value) we can set it as False. For example if we want
+            to apply LoRA only to `query` and `value` but keep `key` without weight updates we should pass `[True,
+            False, True]`
         fan_in_fan_out : bool, optional
             set this to True if the layer to replace stores weight like (fan_in, fan_out).  For example, gpt-2 uses
             `Conv1D` which stores weights like (fan_in, fan_out) and hence this should be set to `True`
@@ -147,24 +145,24 @@ class MergedLinear(nn.Linear, LoRALayer):
         """
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         LoRALayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout, merge_weights=merge_weights)
-        assert out_features % len(enable_lora) == 0, "The length of enable_lora must divide out_features"
+        assert out_features % len(enable_lora) == 0, "The length of enable_lora must divide out_features"  # noqa: S101
         self.enable_lora = enable_lora
         self.fan_in_fan_out = fan_in_fan_out
 
         # Actual trainable parameters
         # To better understand initialization let's imagine that we have such parameters:
-        # - in_features: 128 (embeddings_size)
-        # - out_features: 384 (3 * embedding_size)
-        # - r: 2
-        # - enable_lora: [True, False, True]
+        # ⚬ in_features: 128 (embeddings_size)
+        # ⚬ out_features: 384 (3 * embedding_size)
+        # ⚬ r: 2
+        # ⚬ enable_lora: [True, False, True]
         if r > 0 and any(enable_lora):
             self.lora_A = nn.Parameter(self.weight.new_zeros((r * sum(enable_lora), in_features)))  # (4, 128)
             self.lora_B = nn.Parameter(
-                self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r))  # (256, 2)
+                self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r)),  # (256, 2)
             )  # weights for Conv1D with groups=sum(enable_lora)
 
             # Scaling:
-            # This balances the pretrained model’s knowledge and the new task-specific adaptation
+            # This balances the pretrained model`s knowledge and the new task-specific adaptation
             # https://lightning.ai/pages/community/tutorial/lora-llm/
             # So, set alpha to 1.0 to fully add LoRA. If the LoRA seems to have too much effect (i.e., overfitted), set
             # alpha to lower value. If the LoRA seems to have too little effect, set alpha to higher than 1.0. You can
@@ -186,7 +184,8 @@ class MergedLinear(nn.Linear, LoRALayer):
             # ________________________________________
             # | query         | key       | value    |
             self.lora_ind = self.weight.new_zeros((out_features,), dtype=torch.bool).view(
-                len(enable_lora), -1
+                len(enable_lora),
+                -1,
             )  # (3, 128)
             self.lora_ind[enable_lora, :] = True  # (3, 128)
             self.lora_ind = self.lora_ind.view(-1)  # (384,)
@@ -195,9 +194,8 @@ class MergedLinear(nn.Linear, LoRALayer):
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T
 
-    def reset_parameters(self):
-        # Apparently this method is used when we want to reset all weights, even including
-        # pretrained ones, because `.reset_parameters` method will reset all the weights
+    def reset_parameters(self) -> None:
+        """Reset all the weights, even including pretrained ones."""
         nn.Linear.reset_parameters(self)
         if hasattr(self, "lora_A"):
             # initialize A the same way as the default for nn.Linear and B to zero
@@ -223,19 +221,24 @@ class MergedLinear(nn.Linear, LoRALayer):
         torch.Tensor
             tensor with weight updates and zeros for diselected q, k or v
         """
-
         # Let's image that input x has shape of (64, 64, 256), and self.out_features=384,
         # where embedding_size=128, enable_lora=[True, False, True], then 256 because
         # weights are updated only for query and values (2 * 128) and pretrained weights
         # store for query, key and values (3 * 128)
+        # TODO: check shapes
+        # TODO: why do we need to do transpose twice
+        x = x.transpose(0, 1)
         result = x.new_zeros((*x.shape[:-1], self.out_features))  # (64, 64, 384)
         result = result.view(-1, self.out_features)  # (4096, 384)
         result[:, self.lora_ind] = x.reshape(
-            -1, self.out_features // len(self.enable_lora) * sum(self.enable_lora)
+            -1,
+            self.out_features // len(self.enable_lora) * sum(self.enable_lora),
         )  # (4096, 256)
-        return result.view((*x.shape[:-1], self.out_features))  # (64, 64, 384)
+        # return result.view((*x.shape[:-1], self.out_features))  # (64, 64, 384)
+        # TODO: check shapes
+        return result.view((*x.shape[:-1], self.out_features)).transpose(0, 1)  # (64, 64, 384)
 
-    def train(self, mode: bool = True):
+    def train(self, mode: bool = True) -> None:
         """Set the module into train or eval mode if `mode` is True of False respectively.
 
         For train mode (train(True)) if weights are merged we need to subtract weights updates (LoRA_A @ LoRA_B) from
@@ -251,7 +254,7 @@ class MergedLinear(nn.Linear, LoRALayer):
 
         """
 
-        def T(w):
+        def T(w: torch.Tensor) -> torch.Tensor:  # noqa: N802
             return w.T if self.fan_in_fan_out else w
 
         # if train(True) -> in train mode if weights are merged then we need to unmerge them, otherwise do nothing
@@ -265,9 +268,9 @@ class MergedLinear(nn.Linear, LoRALayer):
 
         # Let's assume that:
         # TODO: verify it
-        # - self.weight.data (384, 128) or (3 * embedding_size, embedding_size)
-        # - lora_A.data (4, 128)
-        # - lora_B.data (256, 2)
+        # ⚬ self.weight.data (384, 128) or (3 * embedding_size, embedding_size)
+        # ⚬ lora_A.data (4, 128)
+        # ⚬ lora_B.data (256, 2)
         if self.merge_weights and update_weights:
             if self.r > 0 and any(self.enable_lora):
                 delta_w = F.conv1d(
@@ -275,7 +278,7 @@ class MergedLinear(nn.Linear, LoRALayer):
                     self.lora_B.data.unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
                     groups=sum(self.enable_lora),
                 ).squeeze(  # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128)
-                    0
+                    0,
                 )  # (1, 256, 128) -> (256, 128)
                 # -1: W = W - delta_W (unmerge), +1: W = W + delta_W (merge)
                 sign = -1 if mode else 1
@@ -283,16 +286,32 @@ class MergedLinear(nn.Linear, LoRALayer):
             self.merged = not mode
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Do the forward pass.
+
+        If LoRA's weights are merged with pretrained ones then it's a simple matrix multiplication.
+        If not, then multiply pretrained weights with input, apply LoRA on input and do summation.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input tensor of shape (batch_size, context_length, embedding_size)
+
+        Returns
+        -------
+        torch.Tensor
+            output tensor of shape (batch_size, context_length, 3 * embedding_size)
+        """
+
         # NOTE: if weights are merged then we can simply do matmul between input tensor x and weight matrix
         #       if not merged, we need to do matmul and then apply LoRA weight update
-        def T(w):
+        def T(w: torch.Tensor) -> torch.Tensor:  # noqa: N802
             return w.T if self.fan_in_fan_out else w
 
         # Let's assume that:
-        # - x (64, 64, 128) or (batch_size, context_length, embedding_size)
-        # - self.weight (384, 128) or (3 * embedding_size, embedding_size)
-        # - lora_A.data (4, 128)
-        # - lora_B.data (256, 2)
+        # ⚬ x (64, 64, 128) or (batch_size, context_length, embedding_size)
+        # ⚬ self.weight (384, 128) or (3 * embedding_size, embedding_size)
+        # ⚬ lora_A.data (4, 128)
+        # ⚬ lora_B.data (256, 2)
 
         # the logic here is that the weights are merged only during inferencing
         # so if they are merged we don't need to do anything with LoRA's A and B matrices
@@ -301,23 +320,27 @@ class MergedLinear(nn.Linear, LoRALayer):
         # and do the summation (as per scheme at the top of the file)
         if self.merged:
             return F.linear(x, T(self.weight), bias=self.bias)
-        else:
+        else:  # noqa: RET505
             # `F.linear` automatically transposes the second argument (T(self.weight) in our case)
             result = F.linear(x, T(self.weight), bias=self.bias)  # (64, 64, 128) @ (384, 128) -> (64, 64, 384)
             if self.r > 0:
-                after_A = F.linear(self.lora_dropout(x), self.lora_A)  # (64, 64, 128) @ (4, 128) -> (64, 64, 4)
+                after_A = F.linear(  # noqa: N806
+                    self.lora_dropout(x),
+                    self.lora_A,
+                )  # (64, 64, 128) @ (4, 128) -> (64, 64, 4)
 
                 # For F.conv1d:
                 # - input: input tensor of shape (minibatch,in_channels,iW)
                 # - weight: filters of shape (out_channels,in_channels/groups,kW)
                 # - groups: split input into groups, in_channels should be divisible by the number of groups. Default: 1
                 # presumably kW - kernel width, iW - sequence width/length
-                after_B = F.conv1d(
+                after_B = F.conv1d(  # noqa: N806
                     after_A.transpose(-2, -1),  # (64, 64, 4) -> (64, 4, 64)
                     self.lora_B.unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
                     groups=sum(self.enable_lora),
                 ).transpose(  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64)
-                    -2, -1
+                    -2,
+                    -1,
                 )  # (64, 256, 64) -> (64, 64, 256)
 
                 # (64, 64, 256) after zero_pad (64, 64, 384)
@@ -350,7 +373,7 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
     # depending on the `bias` value unfreeze bias weights
     if bias == "none":
         return
-    elif bias == "all":
+    elif bias == "all":  # noqa: RET505
         for n, p in model.named_parameters():
             if "bias" in n:
                 p.requires_grad = True
@@ -387,7 +410,7 @@ def lora_state_dict(model: nn.Module, bias: str = "none") -> Dict[str, torch.Ten
     my_state_dict = model.state_dict()
     if bias == "none":
         return {k: my_state_dict[k] for k in my_state_dict if "lora_" in k}
-    elif bias == "all":
+    elif bias == "all":  # noqa: RET505
         return {k: my_state_dict[k] for k in my_state_dict if "lora_" in k or "bias" in k}
     elif bias == "lora_only":
         to_return = {}
@@ -410,12 +433,9 @@ class LoRAConfig:
     dropout: float = 0.0
 
 
-# class CausalSelfAttention(llama.CausalSelfAttention):
 class CausalSelfAttention(attention.CausalSelfAttention):
     lora_config = None
 
-    # def __init__(self, config: llama.LLaMAConfig) -> None:
-    # def __init__(self, config: dict) -> None:
     def __init__(
         self,
         embeddings_size: int,
@@ -427,23 +447,41 @@ class CausalSelfAttention(attention.CausalSelfAttention):
         *,
         is_decoder: bool,
     ) -> None:
+        # TODO: update docstring
+        """Do the same as multi-head attention but with a single matrix multiplication.
+
+        Instead of creating multiple heads and concatenating the result (in addition to creating separate matrices for
+        query, key and value for each head) we can do this in a single pass with a single weight matrix.
+
+        Parameters
+        ----------
+        embeddings_size : int
+            size of the embeddings - the size of input of self-attention
+        context_size : int
+            the number of tokens that will be used during calculation attention map and
+            weighted averaging of value of each token
+        head_size : Optional[int]
+            the size of output of self-attention;
+            if not provided `head_size` will be equal to `embeddings_size` // `num_heads`, so it should be divisible
+            without remainder
+        num_heads : int
+            how many self-attention heads to use
+        bias : bool
+            whether to use bias or not: without bias might be a bit better and faster (but it's not for sure)
+        dropout : float
+            how many connection between tokens are dropped during each forward pass
+        is_decoder : bool
+            if it's a decoder masking of 'future' tokens will be applied
+
+        Raises
+        ------
+        ValueError
+            if `embeddings_size` cannot be divided by `num_heads` without remainder
+        """
+        super().__init__(embeddings_size, context_size, head_size, num_heads, bias, dropout, is_decoder=is_decoder)
         logger.debug("Using Causal Self Attention with LoRA")
-        # TODO: use __init__ from parent class
-        # Skip the parent class __init__ altogether and replace it to avoid
-        # useless allocations
-        nn.Module.__init__(self)
-        # assert config.n_embd % config.n_head == 0
-        assert embeddings_size % num_heads == 0
 
-        if not head_size:
-            if embeddings_size % num_heads != 0:
-                log_error(
-                    "Embeddings size should be divisible by the number of heads without a residual, "
-                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
-                )
-            head_size = embeddings_size // num_heads
-
-        # key, query, value projections for all heads, but in a batch
+        # replace Linear with MergedLinear
         self.causal_self_attention = MergedLinear(
             in_features=embeddings_size,
             out_features=3 * embeddings_size,
@@ -455,27 +493,12 @@ class CausalSelfAttention(attention.CausalSelfAttention):
             merge_weights=True,
             bias=False,
         )
-        # output projection
-        self.projection = nn.Linear(embeddings_size, embeddings_size, bias=False)
-        # TODO: is it indeed regularization section?
-        # regularization
-        self.num_heads = num_heads
-        self.embeddings_size = embeddings_size
-        self.context_size = context_size
-        self.head_size = head_size
-        self.bias = bias
-        self.dropout = dropout
-        self.is_decoder = is_decoder
-        if self.is_decoder:
-            self.register_buffer("tril", torch.tril(torch.ones(self.context_size, self.context_size)))
-        self.attention_dropout = nn.Dropout(self.dropout)
-        self.projection_dropout = nn.Dropout(self.dropout)
 
 
 @contextmanager
-def lora(r, alpha, dropout, enabled: bool = True):
+def lora(r: int, alpha: int, dropout: float, enabled: bool = True) -> None:
     # TODO: make it pretty
-    """A context manager under which you can instantiate the model with LoRA."""
+    """Apply context manager under which you can instantiate the model with LoRA."""
     if not enabled:
         yield
         return
@@ -493,15 +516,4 @@ def lora(r, alpha, dropout, enabled: bool = True):
     attention.CausalSelfAttention = causal_self_attention
     transformer_block.CausalSelfAttention = block_causal_self_attention
 
-    # causal_self_attention = llama.CausalSelfAttention
-    # llama.CausalSelfAttention = CausalSelfAttention
-    # yield
-    # llama.CausalSelfAttention = causal_self_attention
-
     CausalSelfAttention.lora_config = None
-
-
-if __name__ == "__main__":
-    model = MergedLinear(128, 384, 2, 1, 0.1, [True, False, True])
-    model.eval()
-    # model.train(False)

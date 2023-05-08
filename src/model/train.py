@@ -128,8 +128,6 @@ def train(  # noqa: PLR0915
         betas=model_config.betas,
         **extra_args,
     )
-    # TODO: this is a total mess
-    #   need to prettify it
 
     # Step 4.3 Configure LR schedular
     # if warmup/lr_decay iters is None - set default
@@ -164,8 +162,6 @@ def train(  # noqa: PLR0915
         checkpoint_model_path=model_config.checkpoint_model_path,
         tqdm_update_interval=model_config.tqdm_update_interval,
     )
-    # model.train()
-    # model.eval()
     trainer.train(epochs=model_config.epochs)
     logger.info("Training is finished")
 
