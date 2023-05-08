@@ -1,4 +1,5 @@
 # Derived from https://github.com/microsoft/LoRA
+# Derived from https://github.dev/Lightning-AI/lit-llama
 #  ------------------------------------------------------------------------------------------
 #  Copyright (c) Microsoft Corporation. All rights reserved.
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
@@ -95,58 +96,76 @@ class LoRALayer:
 
 
 class MergedLinear(nn.Linear, LoRALayer):
-    # LoRA implemented in a dense layer
     def __init__(
         self,
-        # this part is for pretrained weights
+        # ↓ this part is for pretrained weights
         in_features: int,
         out_features: int,
-        # -----------
-        # this part is for LoRA
+        # ↓ the remaining part is for LoRA
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        # bool value for query, key and value matrices if we want to apply LoRA to not all of them
         enable_lora: List[bool] = [False],
-        # # NOTE: fan_in_fan_out (`bool`): Set this to True if the layer to replace stores weight like (fan_in, fan_out).
-        # For example, gpt-2 uses `Conv1D` which stores weights like (fan_in, fan_out) and hence this should be set to `True`
-        # https://github.com/huggingface/peft/blob/main/src/peft/tuners/lora.py#LL53C9-L53C112
-        fan_in_fan_out: bool = False,  # Set this to True if the layer to replace stores weight like (fan_in, fan_out)
-        # NOTE: tells to merge weights: pretrained weights with LoRA's A and B matrices
+        fan_in_fan_out: bool = False,
         merge_weights: bool = True,
         **kwargs,
     ):
-        # NOTE: i assume that self.weight comes from nn.Linear parent class
-        #   and it stores pretrained weights that we are not planning to update
+        """LoRA wrapper around linear class that is used for calculation q, k and v matrices.
+
+        This class has three weight matrices:
+            1. Pretrained weights are stored as `.weight` (because of the nn.Linear inheritance)
+            2. LoRA A matrix as `self.lora_A`
+            3. LoRA B matrix as `self.lora_B`
+        Only LoRA's A and B matrices are updated, pretrained weights stay frozen.
+
+        Parameters
+        ----------
+        in_features : int
+            number of input features of the pretrained weights
+        out_features : int
+            number of output features of the pretrained weights
+        r : int, optional
+            rank of the weight update matrices. To make sense of using LoRA the rank should be smaller than the rank of
+            the weights of the model.  The rank can be as low as 1: https://arxiv.org/pdf/2106.09685.pdf (section 7.2)
+        lora_alpha : int
+            alpha is needed for scaling updates as alpha/r
+            "This scaling helps to reduce the need to retune hyperparameters when we vary r"
+            https://arxiv.org/pdf/2106.09685.pdf (section 4.1)
+        lora_dropout : float
+            dropout that is applied on the input in the LoRA branch (before multiplying by matrix A)
+        enable_lora : List[bool], optional
+            MergeLinear class is for attention mechanism where qkv are calculated with a single weight matrix. If we don't
+            want to apply LoRA for all three (query, key and value) we can set it as False. For example if we want to apply
+            LoRA only to `query` and `value` but keep `key` without weight updates we should pass `[True, False, True]`
+        fan_in_fan_out : bool, optional
+            set this to True if the layer to replace stores weight like (fan_in, fan_out).  For example, gpt-2 uses
+            `Conv1D` which stores weights like (fan_in, fan_out) and hence this should be set to `True`
+            https://github.com/huggingface/peft/blob/main/src/peft/tuners/lora.py#LL53C9-L53C112
+        merge_weights : bool
+            whether we want to merge weights and LoRA weight updates. This is useful if one wants to use finetuned model
+            as a standalone one (without storing LoRA weight separately) plus it helps to reduce overhead.
+        """
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         LoRALayer.__init__(self, r=r, lora_alpha=lora_alpha, lora_dropout=lora_dropout, merge_weights=merge_weights)
-        # TODO: is it the right way to check?
-        # NOTE: seems like it is
         assert out_features % len(enable_lora) == 0, "The length of enable_lora must divide out_features"
         self.enable_lora = enable_lora
         self.fan_in_fan_out = fan_in_fan_out
-        # Actual trainable parameters
 
-        # in_features: 128 (embeddings_size)
-        # out_features: 384 (3 * embeddings_size)
+        # Actual trainable parameters
+        # To better understand initialization let's imagine that we have such parameters:
+        # - in_features: 128 (embeddings_size)
+        # - out_features: 384 (3 * embedding_size)
+        # - r: 2
+        # - enable_lora: [True, False, True]
         if r > 0 and any(enable_lora):
-            # TODO: it feels like matrix multiplication should be A @ B, and here it looks like
-            # B @ A, since B of size (..., r) and A - (r, ...)
-            # NOTE: perhaps it's somehow connected to the fact that we use Conv1D instead of Linear layers
             self.lora_A = nn.Parameter(self.weight.new_zeros((r * sum(enable_lora), in_features)))  # (4, 128)
             self.lora_B = nn.Parameter(
                 self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r))  # (256, 2)
             )  # weights for Conv1D with groups=sum(enable_lora)
 
-            # We then scale ∆W x by α/r
-            # where α is a constant in r. When optimizing with Adam, tuning α is roughly the same as tuning the learning
-            # rate if we scale the initialization appropriately. As a result, we simply set α to the first r we try
-            # and do not tune it. This scaling helps to reduce the need to retune hyperparameters when we vary r
-            # https://arxiv.org/pdf/2106.09685.pdf, page 4
-
+            # Scaling:
             # This balances the pretrained model’s knowledge and the new task-specific adaptation
             # https://lightning.ai/pages/community/tutorial/lora-llm/
-
             # So, set alpha to 1.0 to fully add LoRA. If the LoRA seems to have too much effect (i.e., overfitted), set
             # alpha to lower value. If the LoRA seems to have too little effect, set alpha to higher than 1.0. You can
             # tune these values to your needs. This value can be even slightly greater than 1.0!
@@ -154,24 +173,24 @@ class MergedLinear(nn.Linear, LoRALayer):
             self.scaling = self.lora_alpha / self.r
 
             # Freezing the pre-trained weight matrix
-            # This class will stores three matrices:
-            # - .weight: stores pretrained weights
-            # - .lora_A and .lora_B: are used for LoRA and stores weight updates
             self.weight.requires_grad = False  # (384, 128)
 
             # Compute the indices
-            # NOTE: apparently we need indices when we want to apply lora not for all three matrices: q, k and v
-
-            # Basically here we create a matrix with len of 'out_features', then represent it as 2D matrix
-            # (len(enable_lora), -1), set all values in the corresponding row as True and after it just
-            # flatten 2D matrix into 1D
-            # TODO: feels weird, there should be a better way to do it
+            # Indices are needed to properly pad weight updates with zeros. If we want to finetune queires and values,
+            # but not keys, then the weights update should be:
+            #
+            # [[ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW,],
+            #  [....................................],
+            #  [ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW,]]
+            #      ↑              ↑            ↑
+            # ________________________________________
+            # | query         | key       | value    |
             self.lora_ind = self.weight.new_zeros((out_features,), dtype=torch.bool).view(
                 len(enable_lora), -1
             )  # (3, 128)
             self.lora_ind[enable_lora, :] = True  # (3, 128)
-            # .view(-1) is the same as .flatten()
             self.lora_ind = self.lora_ind.view(-1)  # (384,)
+
         self.reset_parameters()
         if fan_in_fan_out:
             self.weight.data = self.weight.data.T
@@ -182,18 +201,33 @@ class MergedLinear(nn.Linear, LoRALayer):
         nn.Linear.reset_parameters(self)
         if hasattr(self, "lora_A"):
             # initialize A the same way as the default for nn.Linear and B to zero
-            # TODO: find out what is 'a' and why it's equal to math.sqrt(5)
-            # NOTE: https://github.com/pytorch/pytorch/issues/15314
+            # Wondering why 'a' and is equal to math.sqrt(5)?: https://github.com/pytorch/pytorch/issues/15314
             nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
             nn.init.zeros_(self.lora_B)
 
-    def zero_pad(self, x):  # (64, 64, 256)
-        # NOTE: presumably it's needed when not for all matrices (out of q, k, v) LoRA is applied
-        # For example if we don't want to fine-tune weight for key matrix, so the LoRA updates for
-        # key matrix section will be all filled with zeros
-        # [[ΔW, ΔW, ΔW, 0, 0, 0, ΔW, ΔW, ΔW]
-        #  [ΔW, ΔW, ΔW, 0, 0, 0, ΔW, ΔW, ΔW]
-        #  [ΔW, ΔW, ΔW, 0, 0, 0, ΔW, ΔW, ΔW]]
+    def zero_pad(self, x: torch.Tensor) -> torch.Tensor:
+        """Properly pad weight updates with zeros.
+
+        If we want to finetune queires and values, but not keys, then the weights update should be:
+
+        [[ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW,],
+         [....................................],
+         [ΔW,ΔW,ΔW, ..., 0,0,0, ..., ΔW,ΔW,ΔW,]]
+            ↑              ↑            ↑
+        ________________________________________
+        | query         | key       | value    |
+        ----------------------------------------
+
+        Returns
+        -------
+        torch.Tensor
+            tensor with weight updates and zeros for diselected q, k or v
+        """
+
+        # Let's image that input x has shape of (64, 64, 256), and self.out_features=384,
+        # where embedding_size=128, enable_lora=[True, False, True], then 256 because
+        # weights are updated only for query and values (2 * 128) and pretrained weights
+        # store for query, key and values (3 * 128)
         result = x.new_zeros((*x.shape[:-1], self.out_features))  # (64, 64, 384)
         result = result.view(-1, self.out_features)  # (4096, 384)
         result[:, self.lora_ind] = x.reshape(
@@ -202,103 +236,87 @@ class MergedLinear(nn.Linear, LoRALayer):
         return result.view((*x.shape[:-1], self.out_features))  # (64, 64, 384)
 
     def train(self, mode: bool = True):
-        # NOTE: looks like this method does two things:
-        # 1. sets the class into train mode (should affect Dropout)
-        # 2. subtract LoRA updates from main weight matrix, so we can train A and B matrices separately
+        """Set the module into train or eval mode if `mode` is True of False respectively.
 
-        # NOTE: feels weird to transpose it each time
+        For train mode (train(True)) if weights are merged we need to subtract weights updates (LoRA_A @ LoRA_B) from
+        pretrained weights so we can continue training LoRA's matrices A and B.
+
+        For eval mode (train(False)) if weights are not merged we need to add weight updates to pretrained weights in
+        order to reduce computational overhead.
+
+        Parameters
+        ----------
+        mode : bool, optional
+            if True the module will be set into train mode (affects Dropout and Batchnorm), if False - eval mode.
+
+        """
+
         def T(w):
             return w.T if self.fan_in_fan_out else w
 
-        # if train(True) -> unmerge unless we already have them unmerged
-        # if train(False) -> merge unless we already have them merged
-        # in train mode we will do anything if weights are already merged
-        # in eval mode  we will do anything if weights are not merged
-        should = self.merged if mode else not self.merged
+        # if train(True) -> in train mode if weights are merged then we need to unmerge them, otherwise do nothing
+        # if train(False) -> in eval mode if weights are not merged we need to merge them, otherwise do nothing
+        update_weights = self.merged if mode else not self.merged
 
-        # TODO: does it affects pretrained weights?
-        # TODO: if it's called from nn.Linear will it affect nn.Dropout?
-        # NOTE: despite it being called from nn.Linear this method will put
-        #   all layers into train mode, including nn.Dropout
-        #   except parameters (such as self.lora_A, self.lora_B)
+        # despite being called from nn.Linear this method will put
+        # all layers into train mode, including nn.Dropout
+        # of course except parameters (such as self.lora_A, self.lora_B)
         nn.Linear.train(self, mode)
-        # if we want to merge weight and they are already merged
-        if self.merge_weights and should:
-            # Make sure that the weights are not merged
+
+        # Let's assume that:
+        # TODO: verify it
+        # - self.weight.data (384, 128) or (3 * embedding_size, embedding_size)
+        # - lora_A.data (4, 128)
+        # - lora_B.data (256, 2)
+        if self.merge_weights and update_weights:
             if self.r > 0 and any(self.enable_lora):
-                # lora_A.data (4, 128) -> (1, 4, 128)
-                # lora_B.data (256, 2) -> (256, 2, 1)
                 delta_w = F.conv1d(
-                    self.lora_A.data.unsqueeze(0),
-                    self.lora_B.data.unsqueeze(-1),
-                    groups=sum(self.enable_lora),  # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128)
-                ).squeeze(
+                    self.lora_A.data.unsqueeze(0),  # (4, 128) -> (1, 4, 128)
+                    self.lora_B.data.unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
+                    groups=sum(self.enable_lora),
+                ).squeeze(  # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128)
                     0
                 )  # (1, 256, 128) -> (256, 128)
-                # TODO: shape mismatch: value tensor of shape [128, 256] cannot be broadcast to indexing result of shape [256, 256]
                 # -1: W = W - delta_W (unmerge), +1: W = W + delta_W (merge)
                 sign = -1 if mode else 1
                 self.weight.data += sign * self.zero_pad(T(delta_w * self.scaling))  # (256, 128) -> (384, 128)
             self.merged = not mode
 
-    # def eval(self):
-    #     # NOTE: looks like this method does two things:
-    #     # 1. sets the class into eval mode (should affect Dropout)
-    #     # 2. adds LoRA updates into the main weight matrix, so it lets us to use weights
-    #     #    as a standalone model and should reduce overhead during inference
-
-    #     def T(w):
-    #         return w.T if self.fan_in_fan_out else w
-
-    #     nn.Linear.eval(self)
-    #     if self.merge_weights and not self.merged:
-    #         # Merge the weights and mark it
-    #         if self.r > 0 and any(self.enable_lora):
-    #             delta_w = F.conv1d(
-    #                 self.lora_A.data.unsqueeze(0), self.lora_B.data.unsqueeze(-1), groups=sum(self.enable_lora)
-    #             ).squeeze(0)
-    #             self.weight.data += self.zero_pad(T(delta_w * self.scaling))
-    #         self.merged = True
-
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # NOTE: if weights are merged then we can simply do matmul between input tensor x and weight matrix
         #       if not merged, we need to do matmul and then apply LoRA weight update
         def T(w):
             return w.T if self.fan_in_fan_out else w
 
-        # batch, context, embedding_size
-        # B, T, C = x.shape # (64, 64, 128)
+        # Let's assume that:
+        # - x (64, 64, 128) or (batch_size, context_length, embedding_size)
+        # - self.weight (384, 128) or (3 * embedding_size, embedding_size)
+        # - lora_A.data (4, 128)
+        # - lora_B.data (256, 2)
 
-        # the logic here is that the weight are merged only during training
+        # the logic here is that the weights are merged only during inferencing
         # so if they are merged we don't need to do anything with LoRA's A and B matrices
-        # since forward method is called during inference
+        # but if the weights are not merged that means that the forward method is called during
+        # training and we need to forward pass input through pretrained weights, LoRA A and B matrices
+        # and do the summation (as per scheme at the top of the file)
         if self.merged:
-            # x: (64, 64, 128)
-            # self.weight: (384, 128)
-            # return F.linear(x, T(self.weight), bias=self.bias)
-            result = F.linear(x, T(self.weight), bias=self.bias)
-            return result
+            return F.linear(x, T(self.weight), bias=self.bias)
         else:
-            # if it's training (or more specifically - finetuning)
-            # NOTE: `F.linear` automatically transposes the second argument (T(self.weight) in our case)
+            # `F.linear` automatically transposes the second argument (T(self.weight) in our case)
             result = F.linear(x, T(self.weight), bias=self.bias)  # (64, 64, 128) @ (384, 128) -> (64, 64, 384)
             if self.r > 0:
-                # TODO; why for matrix A we use F.linear, while for B we use conv1D between matrices A and B?
-                #       is it because we can use groups?
-                #       also it might be faster to use Conv1D on a GPU
-                #       https://discuss.pytorch.org/t/how-is-a-conv1d-with-groups-1-different-from-a-linear-layer/100505/2
-                #       but the link show example with groups=1
-                # TODO: check what 'groups' gives us
                 after_A = F.linear(self.lora_dropout(x), self.lora_A)  # (64, 64, 128) @ (4, 128) -> (64, 64, 4)
-                # NOTE: input – input tensor of shape (minibatch,in_channels,iW)
-                #       weight – filters of shape (out_channels,in_channels/groups,kW)
-                #       groups – split input into groups, in_channels should be divisible by the number of groups. Default: 1
-                # perhaps kW - kernel width, iW - sequence width/length?
+
+                # For F.conv1d:
+                # - input: input tensor of shape (minibatch,in_channels,iW)
+                # - weight: filters of shape (out_channels,in_channels/groups,kW)
+                # - groups: split input into groups, in_channels should be divisible by the number of groups. Default: 1
+                # presumably kW - kernel width, iW - sequence width/length
                 after_B = F.conv1d(
-                    after_A.transpose(-2, -1),
-                    self.lora_B.unsqueeze(-1),
-                    groups=sum(self.enable_lora),  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64)
-                ).transpose(
+                    after_A.transpose(-2, -1),  # (64, 64, 4) -> (64, 4, 64)
+                    self.lora_B.unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
+                    groups=sum(self.enable_lora),
+                ).transpose(  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64)
                     -2, -1
                 )  # (64, 256, 64) -> (64, 64, 256)
 
@@ -308,9 +326,28 @@ class MergedLinear(nn.Linear, LoRALayer):
 
 
 def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
+    """Freeze all modules except LoRA's and depending on 'bias' value unfreezes bias weights.
+
+    Parameters
+    ----------
+    model : nn.Module
+        model with LoRA layers
+    bias : str, optional
+        - `none`: all bias weights will be frozen
+        - `lora_only`: only bias weight for LoRA layers will be unfrozen
+        - `all`: all bias weights will be unfrozen
+
+    Raises
+    ------
+    NotImplementedError
+        raise if `bias` not in ["none", "lora_only", "all"]
+    """
+    # freeze all layers except LoRA's
     for n, p in model.named_parameters():
         if "lora_" not in n:
             p.requires_grad = False
+
+    # depending on the `bias` value unfreeze bias weights
     if bias == "none":
         return
     elif bias == "all":
@@ -326,6 +363,27 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = "none") -> None:
 
 
 def lora_state_dict(model: nn.Module, bias: str = "none") -> Dict[str, torch.Tensor]:
+    """Return state_dict with weight of LoRA's A and B matrices and with biases depending on the `bias` value.
+
+    Parameters
+    ----------
+    model : nn.Module
+        model with LoRA layers
+    bias : str, optional
+        - `none`: state dict will not store biases
+        - `lora_only`: state dict will store biases only from LoRA layers
+        - `all`: state dict will store all biases
+
+    Returns
+    -------
+    Dict[str, torch.Tensor]
+        weights and biases of LoRA layers
+
+    Raises
+    ------
+    NotImplementedError
+        raise if `bias` not in ["none", "lora_only", "all"]
+    """
     my_state_dict = model.state_dict()
     if bias == "none":
         return {k: my_state_dict[k] for k in my_state_dict if "lora_" in k}
