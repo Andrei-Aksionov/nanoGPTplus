@@ -8,6 +8,9 @@
 # sourcery skip: default-mutable-arg, switch, remove-unnecessary-else
 
 """
+
+    Low Ranking Adaptation for LLMs scheme
+
             -----------------
             |       h       |
             -----------------
@@ -36,6 +39,8 @@
     of matrices d*r and r*d we will get a matrix d*d which we can sum with frozen pretrained weights and
     thus finetune model.
 
+    The goal of this approach is to move weight updates into a separete matrix which is decomposed with
+    two matrices of a lower rank.
 """
 
 import math
@@ -48,7 +53,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from loguru import logger
 
-# import lit_llama.model as llama
 from src.model.gpt_language_model import attention, transformer_block
 from src.utils.error import log_error
 
@@ -61,29 +65,32 @@ class LoRALayer:
         lora_dropout: float,
         merge_weights: bool,
     ):
-        self.r = r  # r - rank
-        # alpha is needed for scaling updates as alpha/r
-        # "This scaling helps to reduce the need to retune hyperparameters when we vary r"
-        # https://arxiv.org/pdf/2106.09685.pdf, page 4
-        # NOTE: instead of looking manually for a scaling factor the authors of LoRA proposed to
-        # calculate scaling as alpha divided by rank: first set alpha equal to rank and do not change
-        # it while changing rank. The bigger the rank is the closer LoRA to the original pretrained
-        # weight matrix and thus the smaller affect it should give
-        # (but it's highly questionable, most likely I misunderstood something)
+        """Base class to store LoRA specific attributes.
+
+        Parameters
+        ----------
+        r : int
+            rank of the weight update matrices. To make sense of using LoRA the rank should be smaller than the rank of
+            the weights of the model.  The rank can be as low as 1: https://arxiv.org/pdf/2106.09685.pdf (section 7.2)
+        lora_alpha : int
+            alpha is needed for scaling updates as alpha/r
+            "This scaling helps to reduce the need to retune hyperparameters when we vary r"
+            https://arxiv.org/pdf/2106.09685.pdf (section 4.1)
+        lora_dropout : float
+            dropout that is applied on the input in the LoRA branch (before multiplying by matrix A)
+        merge_weights : bool
+            whether we want to merge weights and LoRA weight updates. This is useful if one wants to use finetuned model
+            as a standalone one (without storing LoRA weight separately) plus it helps to reduce overhead.
+        """
+        self.r = r
         self.lora_alpha = lora_alpha
         # Optional dropout
         if lora_dropout > 0.0:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
         else:
             self.lora_dropout = lambda x: x
-
         # Mark the weight as unmerged
-
-        # stores status if the weights are already merged
-        # by default it should be false
-        self.merged = False
-        # if someone wants to use combo pretrained weights + LoRA as a standalone model
-        # then the weights should be merged
+        self.merged = False  # stores status if the weights are already merged
         self.merge_weights = merge_weights
 
 
