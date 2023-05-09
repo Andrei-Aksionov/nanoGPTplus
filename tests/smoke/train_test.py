@@ -35,3 +35,18 @@ class TestTraining:
             # fmt: on
         )
         assert completed_process.returncode == 0
+
+    # Smoke test of Low Ranking Adaptation (LoRA)
+    def test_gpt_small_training_with_lora(self) -> None:
+        completed_process = subprocess.run(
+            # fmt: off
+            [
+                "python", "src/model/train.py", "gpt",
+                "--size", "small",
+                "--device", "cpu",
+                "--dataset-fraction", "0.00001",
+                "--use-lora",
+            ],
+            # fmt: on
+        )
+        assert completed_process.returncode == 0
