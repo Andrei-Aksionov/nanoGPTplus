@@ -107,10 +107,10 @@ class MergedLinear(nn.Linear, LoRALayer):
         merge_weights: bool = True,
         **kwargs,
     ) -> None:
-        """LoRA wrapper around linear class that is used for calculation q, k and v matrices.
+        """LoRA wrapper around linear class that is used for calculation of q, k and v matrices.
 
         This class has three weight matrices:
-            1. Pretrained weights are stored as `.weight` (because of the nn.Linear inheritance)
+            1. Pretrained weights are stored as `self.weight` (because of the nn.Linear inheritance)
             2. LoRA A matrix as `self.lora_A`
             3. LoRA B matrix as `self.lora_B`
         Only LoRA's A and B matrices are updated, pretrained weights stay frozen.
@@ -160,6 +160,13 @@ class MergedLinear(nn.Linear, LoRALayer):
             self.lora_B = nn.Parameter(
                 self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r)),  # (256, 2)
             )  # weights for Conv1D with groups=sum(enable_lora)
+            # Notes about shapes above
+            # - self.lora_A has shape (4, 128): 4 because rank is 2 and LoRA is applied only to two matrices,
+            # 128 is the input size of the x (embedding size). (4, 128) and not (128, 4) because later on in
+            # F.linear function weights are automatically transposed. In addition conv1d requires channels to
+            # be before seq length
+            # - self.lora_B has shape (256, 2): 256 because LoRA applied only to two matrices, so the output is
+            # 128*2; 2 tells to have two channels per group for group convolution
 
             # Scaling:
             # This balances the pretrained model`s knowledge and the new task-specific adaptation
@@ -225,8 +232,8 @@ class MergedLinear(nn.Linear, LoRALayer):
         # where embedding_size=128, enable_lora=[True, False, True], then 256 because
         # weights are updated only for query and values (2 * 128) and pretrained weights
         # store for query, key and values (3 * 128)
-        # TODO: check shapes
-        # TODO: why do we need to do transpose twice
+        # Note: double transpose (in the beginning and in the end) is basically a guard for two-dimensional tensors
+        # for example when we want to merge/unmerge LoRA weights and pretrained weights
         x = x.transpose(0, 1)
         result = x.new_zeros((*x.shape[:-1], self.out_features))  # (64, 64, 384)
         result = result.view(-1, self.out_features)  # (4096, 384)
@@ -234,8 +241,6 @@ class MergedLinear(nn.Linear, LoRALayer):
             -1,
             self.out_features // len(self.enable_lora) * sum(self.enable_lora),
         )  # (4096, 256)
-        # return result.view((*x.shape[:-1], self.out_features))  # (64, 64, 384)
-        # TODO: check shapes
         return result.view((*x.shape[:-1], self.out_features)).transpose(0, 1)  # (64, 64, 384)
 
     def train(self, mode: bool = True) -> None:
@@ -259,19 +264,20 @@ class MergedLinear(nn.Linear, LoRALayer):
 
         # if train(True) -> in train mode if weights are merged then we need to unmerge them, otherwise do nothing
         # if train(False) -> in eval mode if weights are not merged we need to merge them, otherwise do nothing
-        update_weights = self.merged if mode else not self.merged
+        update_pretrained_weights = self.merged if mode else not self.merged
 
         # despite being called from nn.Linear this method will put
         # all layers into train mode, including nn.Dropout
         # of course except parameters (such as self.lora_A, self.lora_B)
         nn.Linear.train(self, mode)
 
+        update_pretrained_weights = True
+
         # Let's assume that:
-        # TODO: verify it
         # ⚬ self.weight.data (384, 128) or (3 * embedding_size, embedding_size)
-        # ⚬ lora_A.data (4, 128)
-        # ⚬ lora_B.data (256, 2)
-        if self.merge_weights and update_weights:
+        # ⚬ self.lora_A.data (4, 128)
+        # ⚬ self.lora_B.data (256, 2)
+        if self.merge_weights and update_pretrained_weights:
             if self.r > 0 and any(self.enable_lora):
                 delta_w = F.conv1d(
                     self.lora_A.data.unsqueeze(0),  # (4, 128) -> (1, 4, 128)
@@ -310,8 +316,8 @@ class MergedLinear(nn.Linear, LoRALayer):
         # Let's assume that:
         # ⚬ x (64, 64, 128) or (batch_size, context_length, embedding_size)
         # ⚬ self.weight (384, 128) or (3 * embedding_size, embedding_size)
-        # ⚬ lora_A.data (4, 128)
-        # ⚬ lora_B.data (256, 2)
+        # ⚬ self.lora_A.data (4, 128)
+        # ⚬ self.lora_B.data (256, 2)
 
         # the logic here is that the weights are merged only during inferencing
         # so if they are merged we don't need to do anything with LoRA's A and B matrices
@@ -433,7 +439,7 @@ class LoRAConfig:
     dropout: float = 0.0
 
 
-class CausalSelfAttention(attention.CausalSelfAttention):
+class LoRACausalSelfAttention(attention.CausalSelfAttention):
     lora_config = None
 
     def __init__(
@@ -447,11 +453,12 @@ class CausalSelfAttention(attention.CausalSelfAttention):
         *,
         is_decoder: bool,
     ) -> None:
-        # TODO: update docstring
         """Do the same as multi-head attention but with a single matrix multiplication.
 
         Instead of creating multiple heads and concatenating the result (in addition to creating separate matrices for
         query, key and value for each head) we can do this in a single pass with a single weight matrix.
+
+        In addition this class uses Low Ranking Adaptation (LoRA) for efficient finetuning.
 
         Parameters
         ----------
@@ -478,7 +485,15 @@ class CausalSelfAttention(attention.CausalSelfAttention):
         ValueError
             if `embeddings_size` cannot be divided by `num_heads` without remainder
         """
-        super().__init__(embeddings_size, context_size, head_size, num_heads, bias, dropout, is_decoder=is_decoder)
+        super().__init__(
+            embeddings_size=embeddings_size,
+            context_size=context_size,
+            head_size=head_size,
+            num_heads=num_heads,
+            bias=bias,
+            dropout=dropout,
+            is_decoder=is_decoder,
+        )
         logger.debug("Using Causal Self Attention with LoRA")
 
         # replace Linear with MergedLinear
@@ -503,17 +518,14 @@ def lora(r: int, alpha: int, dropout: float, enabled: bool = True) -> None:
         yield
         return
 
-    CausalSelfAttention.lora_config = LoRAConfig(r=r, alpha=alpha, dropout=dropout)
+    LoRACausalSelfAttention.lora_config = LoRAConfig(r=r, alpha=alpha, dropout=dropout)
 
-    # save original attention into a variable
-    causal_self_attention = attention.CausalSelfAttention
+    # save original causal self-attention into a variable
     block_causal_self_attention = transformer_block.CausalSelfAttention
-    # replace original attention with LoRA variant
-    attention.CausalSelfAttention = CausalSelfAttention
-    transformer_block.CausalSelfAttention = CausalSelfAttention
+    # replace original causal self-attention with LoRA variant
+    transformer_block.CausalSelfAttention = LoRACausalSelfAttention
     yield
-    # reset original attention
-    attention.CausalSelfAttention = causal_self_attention
+    # reset original causal self-attention
     transformer_block.CausalSelfAttention = block_causal_self_attention
-
-    CausalSelfAttention.lora_config = None
+    # reset lora config
+    LoRACausalSelfAttention.lora_config = None
