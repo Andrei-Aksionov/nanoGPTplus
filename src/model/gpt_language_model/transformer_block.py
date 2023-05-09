@@ -93,10 +93,9 @@ class TransformerBlock(nn.Module):
             "dropout": self.dropout,
             "is_decoder": self.is_decoder,
         }
-        if self.use_causal_self_attention:
-            self.self_attention = CausalSelfAttention(**attention_kwargs)
-        else:
-            self.self_attention = MultiHeadAttention(**attention_kwargs)
+
+        attention_class = CausalSelfAttention if self.use_causal_self_attention else MultiHeadAttention
+        self.self_attention = attention_class(**attention_kwargs)
 
         self.feed_forward = FeedForward(
             embeddings_size=self.embeddings_size,

@@ -33,6 +33,7 @@ def train(  # noqa: PLR0915
     device: Optional[str],
     size: str,
     dataset_fraction: Optional[float] = None,
+    use_lora: bool = False,
 ) -> None:
     """Train a language model.
 
@@ -106,13 +107,20 @@ def train(  # noqa: PLR0915
     # Step 4: Train the model
     # Step 4.1. Create model
     logger.info("Staring training...")
-    if model_config.use_lora:
-        # TODO: LoRA parameters needs to be set in config file
-        # TODO: looks like r and alpha should be equal
-        # with lora(r=2, alpha=3, dropout=0.0, enabled=model_config.use_lora):
-        with lora(r=2, alpha=3, dropout=0.2, enabled=model_config.use_lora):
+    # NOTE: this is just an example of how to use LoRA with the model.
+    # LoRA should be used with pretrained weights and right now only training from scratch is supported.
+    # That's why by default it's disabled in the config file.
+    if model_config.use_lora or use_lora:
+        with lora(
+            r=model_config.lora_rank,
+            alpha=model_config.lora_alpha,
+            dropout=model_config.lora_dropout,
+            enabled=model_config.use_lora or use_lora,
+        ):
             model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
         mark_only_lora_as_trainable(model)
+    else:
+        model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
 
     # Step 4.2. Configure optimizer
     optimizer_parameters = model.optimizer_parameters if hasattr(model, "optimizer_parameters") else model.parameters()
@@ -210,6 +218,12 @@ def main() -> None:
         help="The size of the GPT model",
         required=True,
         type=str,
+    )
+    gpt_subparser.add_argument(
+        "--use-lora",
+        help="Forces to use LoRA no matter what is set in the config file.",
+        action="store_true",
+        required=False,
     )
 
     # combining 'help' output from both argparsers
