@@ -7,7 +7,7 @@ pic 1: LoRA architecture[^1]
 
 Low ranking adaptation is a technique for parameter-efficient finetuning of large language models. Instead of updating all the weights during finetuning (which is very compute intensive) we can learn a separate matrix that will store updates of pretrained weights and in order to reduce number of computations we as well decompose this weight update matrix into two matrices of a lower rank.
 
-As an example: we can have pretrained weights of shape (d, d) that we will not update during finetuning and two matrices A and B of shape (d, r) and (r, d) respectively.
+As an example: we can have pretrained weights of shape (d, d) and two matrices A and B of shape (d, r) and (r, d) respectively; pretreined weights will not be changed during training, only matrices A and B.
 As it can be seen in the scheme above we apply pretrained weights on input, also apply separate weight update matrix formed by A@B matrix multiplication and then do summation.
 
 If d=100 and r=1, then instead of updating 100x100=10_000 parameters (for pretrained weights) we will update only 100x1 (for matrix A) and 1x100 (for matrix B) which makes it in total 200 paremeters to update instead of 10k.
@@ -23,7 +23,7 @@ More about it you can read in:
 
 ### -- About implementation --
 
-If one take a look at the Microsoft's LoRA repo can notice that there are two classes: `Linear` and `MergedLinear` and it can be confusing in the beginning.
+If one take a look at the Microsoft's LoRA repo then can notice that there are two classes: `Linear` and `MergedLinear` and it can be confusing in the beginning.
 
 Basically there are two approaches of calculating query, key and value matrices:
 

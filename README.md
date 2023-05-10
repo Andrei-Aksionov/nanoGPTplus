@@ -10,7 +10,7 @@
 
 ***
 
-In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY). The original code is in a state that is suitable for rapid prototyping, while the code in this repository in my opinion is more mature (with docstrings, comments of what is exactly going on, readme for architectures, ...) hence the name - nanoGPT+ (you can read it as a very-very small plus :laughing:)
+In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY). The original code is in a state that is suitable for rapid prototyping, while the code in this repository in my opinion is more mature (with docstrings, comments of what is exactly going on, readme for architectures, key-value cache and Low Ranking Adaptation (LoRA) implementations, ...) hence the name - nanoGPT+ (you can read it as a very-very small plus :laughing:)
 
 The purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with as few issues as possible).
 
