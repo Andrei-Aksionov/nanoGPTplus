@@ -16,6 +16,7 @@ from src.model import (
     GPTLanguageModel,
     Trainer,
 )
+from src.model.gpt_language_model.peft.lora import lora, mark_only_lora_as_trainable
 from src.utils import (
     RangeChecker,
     get_device,
@@ -26,11 +27,13 @@ from src.utils import (
 )
 
 
-def train(
+# TODO: perhaps it's about time to split this func into a set of smaller ones
+def train(  # noqa: PLR0915
     model_class: torch.nn.Module,
     device: Optional[str],
     size: str,
     dataset_fraction: Optional[float] = None,
+    use_lora: bool = False,
 ) -> None:
     """Train a language model.
 
@@ -104,7 +107,21 @@ def train(
     # Step 4: Train the model
     # Step 4.1. Create model
     logger.info("Staring training...")
-    model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+    # NOTE: this is just an example of how to use LoRA with the model.
+    # LoRA should be used with pretrained weights and right now only training from scratch is supported.
+    # That's why by default it's disabled in the config file.
+    if model_class == GPTLanguageModel and (model_config.use_lora or use_lora):
+        with lora(
+            r=model_config.lora_rank,
+            alpha=model_config.lora_alpha,
+            dropout=model_config.lora_dropout,
+            enabled=model_config.use_lora or use_lora,
+        ):
+            model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+        mark_only_lora_as_trainable(model)
+    else:
+        model = model_class(vocab_size=tokenizer.vocab_size, **grab_arguments(model_class, model_config))
+
     # Step 4.2. Configure optimizer
     optimizer_parameters = model.optimizer_parameters if hasattr(model, "optimizer_parameters") else model.parameters()
     # new PyTorch nightly has a new 'fused' option for AdamW that is much faster
@@ -119,6 +136,7 @@ def train(
         betas=model_config.betas,
         **extra_args,
     )
+
     # Step 4.3 Configure LR schedular
     # if warmup/lr_decay iters is None - set default
     # if it's a float - use it as a portion
@@ -200,6 +218,12 @@ def main() -> None:
         help="The size of the GPT model",
         required=True,
         type=str,
+    )
+    gpt_subparser.add_argument(
+        "--use-lora",
+        help="Forces to use LoRA no matter what is set in the config file.",
+        action="store_true",
+        required=False,
     )
 
     # combining 'help' output from both argparsers

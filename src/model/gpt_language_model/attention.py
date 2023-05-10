@@ -406,6 +406,14 @@ class CausalSelfAttention(nn.Module):
             # [0.1, 0.2, 0.3]  -> [0.1, 0.2, 0.3]
             # and after softmax `-inf` becomes 0
             # this doesn't allow current token communicate with future ones
+
+            # TODO: do I correctly apply masking
+            # w : (batch, head, q_seq_length, kv_seq_length)   # noqa: ERA001
+            # w = torch.matmul(q, k) # noqa: ERA001
+            # if self.scale:
+            #     w = w / math.sqrt(v.size(-1))  # noqa: ERA001
+            # nd, ns = w.size(-2), w.size(-1): ERA001
+            # b = self.bias[:, :, ns-nd:ns, :ns]: ERA001
             attention_scores = attention_scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))  # (B, nh, T, T)
 
         # since we want to do weighted averaging we need to transform attention scores into range [0, 1]

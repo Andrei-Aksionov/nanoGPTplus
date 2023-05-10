@@ -1,23 +1,22 @@
 
 <p>
-    <h2 align="center">Welcome to NanoGPT+ in PyTorch</h2>
-    <h5 align="center">Knock-off edition (but with enchantments)<h5>
+    <h2 align="center">Welcome to NanoGPT+</h2>
+    <h4 align="center">Knock-off edition</h4>
+    <h6 align="center">but with enchantments</h6>
 </p>
 
-[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
-[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
+![Python versions](/assets/readme/python_versions.svg)
 [![test](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml/badge.svg)](https://github.com/Andrei-Aksionov/nanoGPTplus/actions/workflows/test.yaml)
 
 ***
 
-In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY). The original code is in a state that is suitable for rapid prototyping, while the code in this repository in my opinion is more mature (with docstrings, comments of what is exactly going on, readme for architectures, ...) hence the name - nanoGPT+ (you can read it as a very-very small plus :laughing:)
+In this repository I want to rewrite the code for `nanoGPT` presented by Andrej Karpathy in [this video](https://www.youtube.com/watch?v=kCc8FmEb1nY). The original code is in a state that is suitable for rapid prototyping, while the code in this repository in my opinion is more mature (with docstrings, comments of what is exactly going on, readme for architectures, key-value cache and Low Ranking Adaptation (LoRA) implementations, ...) hence the name - nanoGPT+ (you can read it as a very-very small plus :laughing:)
 
 The purpose of it is to better understand how Transformer architecture works by actually writing code and, if possible, making it better (or at least to make it work with as few issues as possible).
 
 > **Note**: while the code in this repository reflects almost all the logic of the original one, because of lack of access to GPU (or moreover to a multiple GPUs/nodes with multiple GPUs) I haven't added GPU specific code, so if you have one (GPU or even a node) then you should look at the [original repo](https://github.com/karpathy/nanoGPT).
 
-<p align=center><img src="references/readme/amazon_prime.jpg"></p>
+<p align=center><img src="assets/readme/amazon_prime.jpg"></p>
 
 # Project structure
 

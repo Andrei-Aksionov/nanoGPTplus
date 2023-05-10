@@ -1,6 +1,6 @@
 # Notes about Transformer architecture
 
-![transformer architecture](../../../references/transformer/transformer_architecture.png)
+![transformer architecture](../../../assets/transformer/transformer_architecture.png)
 
 pic 1: Transformer architecture[^1] (encoder on the left and decoder is on the right side).
 
@@ -11,7 +11,7 @@ Decoder consists of transformer blocks and each transformer block consists of tw
 1. Self-attention layer.
 2. Feed-forward layer.
 
-![transformer block](../../../references/transformer/transformer_block.png)
+![transformer block](../../../assets/transformer/transformer_block.png)
 
 pic 2: Transformer block[^1].
 
@@ -73,4 +73,4 @@ In order to build decoder one needs to have:
 4. Final head fully-connected layer to transform final token embeddings into predictions.
 
 [^1]: [Illustrated transformer](https://jalammar.github.io/illustrated-transformer/)
-[^2]:[Andrej Karpaty's nanoGPT Google Colab](<https://colab.research.google.com/drive/1JMLa53HDuA-i7ZBmqV7ZnA3c_fvtXnx-?usp=sharing#scrollTo=h5hjCcLDr2WC>)
+[^2]:[Andrej Karpathy's nanoGPT Google Colab](<https://colab.research.google.com/drive/1JMLa53HDuA-i7ZBmqV7ZnA3c_fvtXnx-?usp=sharing#scrollTo=h5hjCcLDr2WC>)

@@ -8,6 +8,7 @@ from loguru import logger
 from torch import Tensor, nn
 from tqdm import trange
 
+from src.model.gpt_language_model.peft.lora import MergedLinear
 from src.model.gpt_language_model.transformer_block import LayerNorm, TransformerBlock
 from src.utils import log_error
 
@@ -118,6 +119,7 @@ class GPTLanguageModel(nn.Module):
         )
 
     def __get_parameters_number(self, exclude_positional_embeddings: bool = True) -> int:
+        # TODO: print total number of parameters and number of learnable parameters
         """Return total number of parameters of the model without counting parameters of positional embeddings."""
         params_count = sum(param.numel() for param in self.parameters())
         if exclude_positional_embeddings:
@@ -139,6 +141,8 @@ class GPTLanguageModel(nn.Module):
             module of the network
         """
         if isinstance(module, (nn.Embedding, nn.Linear)):
+            # TODO: check different std init works better
+            #   0.2 / sqrt ( 2 * number of transformer blocks)
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
@@ -237,7 +241,7 @@ class GPTLanguageModel(nn.Module):
         """
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay, no_decay = set(), set()
-        expected_weight_modules = (nn.Linear, nn.LayerNorm, LayerNorm, nn.Embedding)
+        expected_weight_modules = (nn.Linear, nn.LayerNorm, LayerNorm, nn.Embedding, MergedLinear)
         for pn, _ in self.named_parameters():
             # get the parent module by the parameter's name
             module = reduce(lambda module, key: getattr(module, key), pn.split(".")[:-1], self)

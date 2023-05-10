@@ -97,6 +97,8 @@ class Trainer:
         # during evaluation there is no need to store any information for backpropagation
         with torch.set_grad_enabled(mode == "train"):
             logits = self.model(inputs)
+            # TODO: probably it's not an optimal solution to use the last loss value
+            #   for gradient accumulation strategy during backprop
             loss = self.loss(logits, targets)
         # if training -> do the gradient descent
         if mode == "train":
