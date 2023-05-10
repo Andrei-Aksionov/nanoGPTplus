@@ -5,7 +5,7 @@
 ![LoRA](https://lightningaidev.wpengine.com/wp-content/uploads/2023/04/lora-3-1024x742.png)
 pic 1: LoRA architecture[^1]
 
-Low ranking adaptation is a technique for parameter-efficient finetuning large language models. Instead of updating all the weights during finetuning (which is very compute intensive) we can learn a separate matrix that will store updates of pretrained weights and in order to reduce number of computations we as well decompose this weight update matrix into two matrices of a lower rank.
+Low ranking adaptation is a technique for parameter-efficient finetuning of large language models. Instead of updating all the weights during finetuning (which is very compute intensive) we can learn a separate matrix that will store updates of pretrained weights and in order to reduce number of computations we as well decompose this weight update matrix into two matrices of a lower rank.
 
 As an example: we can have pretrained weights of shape (d, d) that we will not update during finetuning and two matrices A and B of shape (d, r) and (r, d) respectively.
 As it can be seen in the scheme above we apply pretrained weights on input, also apply separate weight update matrix formed by A@B matrix multiplication and then do summation.
@@ -38,5 +38,4 @@ output into three chunks to have queries, keys and values. To cover this approac
 Note: examples of calculating qkv matrices with separate multiplications and a single one you can find in
 `attention.py` files of this repository.
 
----
 [^1]: [Parameter-Efficient LLM Finetuning With Low-Rank Adaptation (LoRA) by Lightning.ai](https://lightning.ai/pages/community/tutorial/lora-llm/)

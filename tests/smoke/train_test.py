@@ -36,13 +36,19 @@ class TestTraining:
         )
         assert completed_process.returncode == 0
 
-    # Smoke test of Low Ranking Adaptation (LoRA)
-    def test_gpt_small_training_with_lora(self) -> None:
+
+# LoRA testing should be done after training without it to not confuse saved checkpoints
+@pytest.mark.smoke
+@pytest.mark.order(5)
+# Smoke tests of Low Ranking Adaptation (LoRA)
+class TestTrainingWithLoRA:
+    @pytest.mark.parametrize("model_size", list(config.model.gpt.size.keys()))
+    def test_gpt_small_training_with_lora(self, model_size: str) -> None:
         completed_process = subprocess.run(
             # fmt: off
             [
                 "python", "src/model/train.py", "gpt",
-                "--size", "small",
+                "--size", model_size,
                 "--device", "cpu",
                 "--dataset-fraction", "0.00001",
                 "--use-lora",

@@ -110,7 +110,7 @@ def train(  # noqa: PLR0915
     # NOTE: this is just an example of how to use LoRA with the model.
     # LoRA should be used with pretrained weights and right now only training from scratch is supported.
     # That's why by default it's disabled in the config file.
-    if model_config.use_lora or use_lora:
+    if model_class == GPTLanguageModel and (model_config.use_lora or use_lora):
         with lora(
             r=model_config.lora_rank,
             alpha=model_config.lora_alpha,

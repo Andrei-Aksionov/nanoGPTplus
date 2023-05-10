@@ -16,13 +16,13 @@ r"""
                     +
                  /     \
     ----------------    -----------          Matrix initialization:
-    |  pretrained  |     \       /           B = 0
-    |   weights    |      \  B  /            A = N(0, sigma^2)
+    |  pretrained  |     \   B    /          B = 0
+    |   weights    |      \ r*d  /           A = N(0, sigma^2)
     |              |       -----
-    |  W e R^(dxd) |       | r |             r - rank
+    |  W e R^(d*d) |       | r |             r - rank
     |              |       -----
     ----------------      /  A  \
-            ^            /       \
+            ^            /  d*r  \
              \          -----------
               \         ^
                \       /
