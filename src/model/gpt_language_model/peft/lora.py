@@ -510,7 +510,7 @@ class LoRACausalSelfAttention(attention.CausalSelfAttention):
             enable_lora=[True, False, True],
             fan_in_fan_out=False,
             merge_weights=True,
-            bias=False,
+            bias=bias,
         )
 
 
