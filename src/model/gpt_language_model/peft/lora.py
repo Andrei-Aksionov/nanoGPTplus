@@ -226,6 +226,11 @@ class MergedLinear(nn.Linear, LoRALayer):
         | query         | key       | value    |
         ----------------------------------------
 
+        Parameters
+        ----------
+        x : torch.Tensor
+            tensor with weights update that needs to be padded with zeros
+
         Returns
         -------
         torch.Tensor
