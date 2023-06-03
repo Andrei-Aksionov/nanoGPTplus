@@ -226,6 +226,11 @@ class MergedLinear(nn.Linear, LoRALayer):
         | query         | key       | value    |
         ----------------------------------------
 
+        Parameters
+        ----------
+        x : torch.Tensor
+            tensor with weights update that needs to be padded with zeros
+
         Returns
         -------
         torch.Tensor
@@ -505,7 +510,7 @@ class LoRACausalSelfAttention(attention.CausalSelfAttention):
             enable_lora=[True, False, True],
             fan_in_fan_out=False,
             merge_weights=True,
-            bias=False,
+            bias=bias,
         )
 
 
