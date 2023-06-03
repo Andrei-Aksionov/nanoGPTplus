@@ -1,11 +1,11 @@
 import math
-from abc import abstractclassmethod
+from abc import ABC, abstractmethod
 from typing import Optional
 
 import torch
 
 
-class LRSchedulerBase:
+class LRSchedulerBase(ABC):
     def __init__(self, optimizer: torch.optim.Optimizer) -> None:
         """Create base class for custom learning rate schedulers.
 
@@ -17,7 +17,7 @@ class LRSchedulerBase:
         super().__init__()
         self.optimizer = optimizer
 
-    @abstractclassmethod
+    @abstractmethod
     def _get_lr(self, iteration: int) -> float:
         pass
 
