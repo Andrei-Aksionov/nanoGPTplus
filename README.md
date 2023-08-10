@@ -173,3 +173,5 @@ The list of all hooks one can find in a config fils: `.pre-commit-config.yaml`
 ```bash
 pre-commit run --all-files
 ```
+
+Testing venv cache
