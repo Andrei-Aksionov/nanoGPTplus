@@ -94,10 +94,9 @@ def get_model_config(model_class: torch.nn.Module, config: dict, size: str) -> d
         if there is no config in the config file for the provided model class
     """
     model_class_name = model_class.__name__
-    model_config = {
-        "BigramLanguageModel": config.model.bigram,
-        "GPTLanguageModel": config.model.gpt,
-    }.get(model_class_name)
+    model_config = {"BigramLanguageModel": config.model.bigram, "GPTLanguageModel": config.model.gpt}.get(
+        model_class_name
+    )
     if model_config is None:
         log_error(f"There is no config for class '{model_class_name}'")
     return model_config.size[size]

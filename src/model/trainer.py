@@ -86,12 +86,7 @@ class Trainer:
     def __move_batch_to(self, batch: List[Tensor]) -> List[Tensor]:
         return [x.to(self.device) for x in batch]
 
-    def _train_step(
-        self,
-        mode: str,
-        idx: int,
-        batch: Union[tuple, list],
-    ) -> Tensor:
+    def _train_step(self, mode: str, idx: int, batch: Union[tuple, list]) -> Tensor:
         # data should be on the same device as the model
         inputs, targets = self.__move_batch_to(batch)
         # during evaluation there is no need to store any information for backpropagation
@@ -127,10 +122,7 @@ class Trainer:
         for epoch in range(epochs):
             tqdm.write(f" Epoch: {epoch} ".center(40, "="))
             # reuse code for training and evaluation
-            for mode, dataloader in zip(
-                ["train", "eval"],
-                [self.train_dataloader, self.eval_dataloader],
-            ):
+            for mode, dataloader in zip(["train", "eval"], [self.train_dataloader, self.eval_dataloader]):
                 # set model into train or eval mode: required for BatchNorm or Dropout
                 self.model.train() if mode == "train" else self.model.eval()
                 tqdm_loop = tqdm(dataloader, desc=mode, ascii=True)
@@ -152,7 +144,7 @@ class Trainer:
                     if eval_loss < best_eval_loss:
                         logger.info(
                             "Current eval loss is `{:.4f}` which is smaller than current best loss of `{:.4f}`; "
-                            "saving the model...".format(eval_loss, best_eval_loss),
+                            "saving the model...".format(eval_loss, best_eval_loss)
                         )
                         best_eval_loss = eval_loss
                         save_checkpoint(state=self.model.state_dict(), path=self.checkpoint_model_path)

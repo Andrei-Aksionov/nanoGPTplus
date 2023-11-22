@@ -6,7 +6,7 @@ from src import config
 from src.data.downloader import download
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 @pytest.mark.order(1)
 class TestDataset:
     def test_tiny_shakespeare_download(self) -> None:

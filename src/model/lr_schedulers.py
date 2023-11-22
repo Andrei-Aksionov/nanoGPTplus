@@ -36,11 +36,7 @@ class LRSchedulerBase(ABC):
 
 class CosineWarmupLRScheduler(LRSchedulerBase):
     def __init__(
-        self,
-        optimizer: torch.optim.Optimizer,
-        warmup_iters: int,
-        lr_decay_iters: int,
-        min_lr: Optional[float] = None,
+        self, optimizer: torch.optim.Optimizer, warmup_iters: int, lr_decay_iters: int, min_lr: Optional[float] = None
     ) -> None:
         """Cosine learning rate schedular with warmup.
 
@@ -78,12 +74,7 @@ class CosineWarmupLRScheduler(LRSchedulerBase):
 
 
 class CustomLRScheduler(LRSchedulerBase):
-    def __init__(
-        self,
-        optimizer: torch.optim.Optimizer,
-        model_dim: int,
-        warmup_iters: int,
-    ) -> None:
+    def __init__(self, optimizer: torch.optim.Optimizer, model_dim: int, warmup_iters: int) -> None:
         """Learning rate scheduler according to the formula in the original Transformer.
 
         https://www.tensorflow.org/text/tutorials/transformer#set_up_the_optimizer

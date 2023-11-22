@@ -10,14 +10,7 @@ from src.utils import log_error
 
 class SelfAttentionHead(nn.Module):
     def __init__(
-        self,
-        embeddings_size: int,
-        context_size: int,
-        head_size: int,
-        bias: bool,
-        dropout: float,
-        *,
-        is_decoder: bool,
+        self, embeddings_size: int, context_size: int, head_size: int, bias: bool, dropout: float, *, is_decoder: bool
     ) -> None:
         """Single self-attention head.
 
@@ -186,7 +179,7 @@ class MultiHeadAttention(nn.Module):
             if embeddings_size % num_heads != 0:
                 log_error(
                     "Embeddings size should be divisible by number of heads without remainder, "
-                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
+                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
                 )
             head_size = embeddings_size // num_heads
 
@@ -209,7 +202,7 @@ class MultiHeadAttention(nn.Module):
                     is_decoder=self.is_decoder,
                 )
                 for _ in range(self.num_heads)
-            ],
+            ]
         )
 
         # if after concatenation the size of channels is bigger than embeddings size
@@ -260,15 +253,11 @@ class MultiHeadAttention(nn.Module):
 
         if all(x is not None for x in kv_cache):
             kv_cache = torch.stack(
-                kv_cache,
-                dim=-2,
+                kv_cache, dim=-2
             )  # num_heads * (2, B, T, head_size) -> (2, B, T, num_heads, head_size)
             kv_cache = kv_cache.transpose(2, 3)  # (2, B, num_heads, T, head_size)
 
-        return (
-            output,  # (B, T, num_heads * head_size)
-            kv_cache,  # num_heads * None | (2, B, num_heads, T, head_size)
-        )
+        return (output, kv_cache)  # (B, T, num_heads * head_size)  # num_heads * None | (2, B, num_heads, T, head_size)
 
 
 class CausalSelfAttention(nn.Module):
@@ -319,7 +308,7 @@ class CausalSelfAttention(nn.Module):
             if embeddings_size % num_heads != 0:
                 log_error(
                     "Embeddings size should be divisible by the number of heads without a residual, "
-                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}",
+                    f"but was provided: embeddings_size={embeddings_size}; num_heads={num_heads}"
                 )
             head_size = embeddings_size // num_heads
 
@@ -373,8 +362,7 @@ class CausalSelfAttention(nn.Module):
 
         # single pass for query, key and value; that's why we need to split into 3 parts
         query, key, value = self.causal_self_attention(x).split(
-            self.head_size * self.num_heads,
-            dim=-1,
+            self.head_size * self.num_heads, dim=-1
         )  # (B, T, C) -> (B, T, 3 * hs * nh) -> (B, T, hs * nh)
 
         # transform (B, T, nh * hs) -> (B, nh, T, hs) so it's similar to multi-head attention

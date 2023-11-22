@@ -2,10 +2,7 @@ from typing import List, Optional, Tuple, Union
 
 from torch import Tensor, nn
 
-from src.model.gpt_language_model.attention import (
-    CausalSelfAttention,
-    MultiHeadAttention,
-)
+from src.model.gpt_language_model.attention import CausalSelfAttention, MultiHeadAttention
 from src.model.gpt_language_model.feed_forward import FeedForward
 
 

@@ -7,7 +7,7 @@ from src import config
 
 @pytest.mark.order(4)
 class TestTokenGeneration:
-    @pytest.mark.smoke
+    @pytest.mark.smoke()
     @pytest.mark.parametrize("model_size", list(config.model.bigram.size.keys()))
     def test_bigram_token_generation(self, model_size: str) -> None:
         completed_process = subprocess.run(
@@ -25,7 +25,7 @@ class TestTokenGeneration:
         )
         assert completed_process.returncode == 0
 
-    @pytest.mark.smoke
+    @pytest.mark.smoke()
     @pytest.mark.parametrize("model_size", list(config.model.gpt.size.keys()))
     def test_gpt_token_generation(self, model_size: str) -> None:
         completed_process = subprocess.run(
@@ -43,7 +43,7 @@ class TestTokenGeneration:
         )
         assert completed_process.returncode == 0
 
-    @pytest.mark.smoke
+    @pytest.mark.smoke()
     @pytest.mark.parametrize("model_type", ["gpt2"])
     def test_gpt2_pretrained_token_generation_fast(self, model_type: str) -> None:
         completed_process = subprocess.run(
@@ -61,7 +61,7 @@ class TestTokenGeneration:
         )
         assert completed_process.returncode == 0
 
-    @pytest.mark.slow
+    @pytest.mark.slow()
     @pytest.mark.parametrize("model_type", ["gpt2", "gpt2-medium", "gpt2-large", "gpt2-xl"])
     def test_gpt2_pretrained_token_generation_slow(self, model_type: str) -> None:
         completed_process = subprocess.run(
@@ -80,7 +80,7 @@ class TestTokenGeneration:
         assert completed_process.returncode == 0
 
     # testing key-value cache
-    @pytest.mark.smoke
+    @pytest.mark.smoke()
     @pytest.mark.parametrize("model_type", ["gpt2"])
     def test_gpt2_pretrained_token_generation_fast_kv_cache(self, model_type: str) -> None:
         completed_process = subprocess.run(

@@ -83,7 +83,7 @@ def generate_new_tokens(
         elif size and gpt2_config:
             log_error(
                 "For GPT language model either size or gpt2_config has to be provided, not both, "
-                f"but was provided size={size} and gpt2_config={gpt2_config}",
+                f"but was provided size={size} and gpt2_config={gpt2_config}"
             )
 
     # if all checks are passed, that means that either size of gpt2_config is provided
@@ -107,11 +107,7 @@ def generate_new_tokens(
     # use only those kwargs that are accepted by function
     kwargs = grab_arguments(
         func=model.generate,
-        kwargs={
-            "max_new_tokens": max_new_tokens,
-            "temperature": temperature,
-            "use_kv_cache": use_kv_cache,
-        },
+        kwargs={"max_new_tokens": max_new_tokens, "temperature": temperature, "use_kv_cache": use_kv_cache},
     )
     # model returns indices of the dictionary
     new_token_indices = model.generate(init_context, **kwargs).squeeze().tolist()
@@ -125,24 +121,16 @@ def main() -> None:
     """Generate new tokens from either GPT or a simple bigram language model."""
     # main parser will store subparsers, shared parser - arguments that are shared between subparsers
     main_parser = argparse.ArgumentParser(
-        description="Generate new tokens with Bigram or GPT model",
-        formatter_class=argparse.RawTextHelpFormatter,
+        description="Generate new tokens with Bigram or GPT model", formatter_class=argparse.RawTextHelpFormatter
     )
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
     # ---------- shared arguments ----------
     shared_parser.add_argument(
-        "--device",
-        help="Optionally you can select device on which the model will be trained",
-        required=False,
-        type=str,
+        "--device", help="Optionally you can select device on which the model will be trained", required=False, type=str
     )
     shared_parser.add_argument(
-        "--max-new-tokens",
-        default=100,
-        help="How many new tokens do you want to generate",
-        required=False,
-        type=int,
+        "--max-new-tokens", default=100, help="How many new tokens do you want to generate", required=False, type=int
     )
     shared_parser.add_argument(
         "--temperature",
@@ -153,39 +141,22 @@ def main() -> None:
         type=float,
     )
     shared_parser.add_argument(
-        "--fix-seed",
-        help="Make token generation deterministic",
-        action="store_true",
-        required=False,
+        "--fix-seed", help="Make token generation deterministic", action="store_true", required=False
     )
     shared_parser.add_argument(
-        "--continue-tokens",
-        default=" ",
-        help="Generation should continue these tokens",
-        required=False,
-        type=str,
+        "--continue-tokens", default=" ", help="Generation should continue these tokens", required=False, type=str
     )
     # ---------- subparsers ----------
     subparsers = main_parser.add_subparsers(dest="model", description="Choose model type")
     # bigram subparser
     bigram_subparser = subparsers.add_parser("bigram", parents=[shared_parser])
     bigram_subparser.add_argument(
-        "--size",
-        "-s",
-        choices=["large"],
-        help="The size of the Bigram model",
-        required=True,
-        type=str,
+        "--size", "-s", choices=["large"], help="The size of the Bigram model", required=True, type=str
     )
     # gpt subparser
     gpt_subparser = subparsers.add_parser("gpt", parents=[shared_parser])
     gpt_subparser.add_argument(
-        "--size",
-        "-s",
-        choices=["small", "medium", "large"],
-        help="The size of the GPT model",
-        required=False,
-        type=str,
+        "--size", "-s", choices=["small", "medium", "large"], help="The size of the GPT model", required=False, type=str
     )
     gpt_subparser.add_argument(
         "--gpt2-config",
@@ -195,10 +166,7 @@ def main() -> None:
         type=str,
     )
     gpt_subparser.add_argument(
-        "--use-kv-cache",
-        help="Use kv-value cache to speed up token generation",
-        action="store_true",
-        required=False,
+        "--use-kv-cache", help="Use kv-value cache to speed up token generation", action="store_true", required=False
     )
     # combining 'help' output from both argparsers
     shared_parser_help = (
@@ -209,10 +177,7 @@ def main() -> None:
 
     # parser arguments
     args = vars(main_parser.parse_args())
-    model_name = {
-        "bigram": BigramLanguageModel,
-        "gpt": GPTLanguageModel,
-    }[args.pop("model")]
+    model_name = {"bigram": BigramLanguageModel, "gpt": GPTLanguageModel}[args.pop("model")]
 
     # run token generation
     generate_new_tokens(model_name, **args)

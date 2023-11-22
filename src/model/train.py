@@ -10,21 +10,9 @@ from torch.utils.data import DataLoader
 
 from src import config
 from src.data import CharTokenizer, NextTokenDataset
-from src.model import (
-    BigramLanguageModel,
-    CosineWarmupLRScheduler,
-    GPTLanguageModel,
-    Trainer,
-)
+from src.model import BigramLanguageModel, CosineWarmupLRScheduler, GPTLanguageModel, Trainer
 from src.model.gpt_language_model.peft.lora import lora, mark_only_lora_as_trainable
-from src.utils import (
-    RangeChecker,
-    get_device,
-    get_model_config,
-    grab_arguments,
-    pickle_dump,
-    set_seed,
-)
+from src.utils import RangeChecker, get_device, get_model_config, grab_arguments, pickle_dump, set_seed
 
 
 # TODO: perhaps it's about time to split this func into a set of smaller ones
@@ -131,10 +119,7 @@ def train(  # noqa: PLR0915
     else:
         extra_args = {}
     optimizer = torch.optim.AdamW(
-        optimizer_parameters,
-        lr=model_config.learning_rate,
-        betas=model_config.betas,
-        **extra_args,
+        optimizer_parameters, lr=model_config.learning_rate, betas=model_config.betas, **extra_args
     )
 
     # Step 4.3 Configure LR schedular
@@ -154,9 +139,7 @@ def train(  # noqa: PLR0915
         lr_decay_iters = int(len(train_dataloader) * lr_decay_iters)
     logger.debug("LR decay iters: {}".format(lr_decay_iters))
     lr_scheduler = CosineWarmupLRScheduler(
-        optimizer=optimizer,
-        warmup_iters=warmup_iters,
-        lr_decay_iters=lr_decay_iters,
+        optimizer=optimizer, warmup_iters=warmup_iters, lr_decay_iters=lr_decay_iters
     )
     # Step 4.4. Start training
     trainer = Trainer(
@@ -178,17 +161,13 @@ def main() -> None:
     """Train either GPT or a simple bigram language model on tiny-shakespeare dataset."""
     # main parser will store subparsers, shared parser - arguments that are shared between subparsers
     main_parser = argparse.ArgumentParser(
-        description="Train bigram or GPT language model",
-        formatter_class=argparse.RawTextHelpFormatter,
+        description="Train bigram or GPT language model", formatter_class=argparse.RawTextHelpFormatter
     )
     shared_parser = argparse.ArgumentParser(add_help=False)
     # ordering matters: first shared arguments, then - subparsers
     # ---------- shared arguments ----------
     shared_parser.add_argument(
-        "--device",
-        help="Optionally you can select device on which the model will be trained",
-        required=False,
-        type=str,
+        "--device", help="Optionally you can select device on which the model will be trained", required=False, type=str
     )
     shared_parser.add_argument(
         "--dataset-fraction",
@@ -202,22 +181,12 @@ def main() -> None:
     # bigram subparser
     bigram_subparser = subparsers.add_parser("bigram", parents=[shared_parser])
     bigram_subparser.add_argument(
-        "--size",
-        "-s",
-        choices=["large"],
-        help="The size of the Bigram model",
-        required=True,
-        type=str,
+        "--size", "-s", choices=["large"], help="The size of the Bigram model", required=True, type=str
     )
     # gpt subparser
     gpt_subparser = subparsers.add_parser("gpt", parents=[shared_parser])
     gpt_subparser.add_argument(
-        "--size",
-        "-s",
-        choices=["small", "medium", "large"],
-        help="The size of the GPT model",
-        required=True,
-        type=str,
+        "--size", "-s", choices=["small", "medium", "large"], help="The size of the GPT model", required=True, type=str
     )
     gpt_subparser.add_argument(
         "--use-lora",
@@ -235,10 +204,7 @@ def main() -> None:
 
     # parser arguments
     args = vars(main_parser.parse_args())
-    model_name = {
-        "bigram": BigramLanguageModel,
-        "gpt": GPTLanguageModel,
-    }[args.pop("model")]
+    model_name = {"bigram": BigramLanguageModel, "gpt": GPTLanguageModel}[args.pop("model")]
 
     # run model training
     train(model_name, **args)

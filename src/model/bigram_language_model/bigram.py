@@ -50,17 +50,10 @@ class BigramLanguageModel(nn.Module):
             tensor with loss value (of how good model's predictions are)
         """
         B, T, C = logits.shape  # noqa: N806
-        return F.cross_entropy(
-            logits.view(B * T, C),
-            targets.view(B * T),
-        )
+        return F.cross_entropy(logits.view(B * T, C), targets.view(B * T))
 
     def generate(
-        self,
-        idx: Tensor,
-        max_new_tokens: int,
-        temperature: float = 1.0,
-        top_k_logits: Optional[int] = None,
+        self, idx: Tensor, max_new_tokens: int, temperature: float = 1.0, top_k_logits: Optional[int] = None
     ) -> Tensor:
         """Generate new character after the current one.
 

@@ -56,13 +56,7 @@ from src.model.gpt_language_model import attention, transformer_block
 
 
 class LoRALayer:
-    def __init__(
-        self,
-        r: int,
-        lora_alpha: int,
-        lora_dropout: float,
-        merge_weights: bool,
-    ) -> None:
+    def __init__(self, r: int, lora_alpha: int, lora_dropout: float, merge_weights: bool) -> None:
         """Store LoRA specific attributes in a class.
 
         Parameters
@@ -160,7 +154,7 @@ class MergedLinear(nn.Linear, LoRALayer):
         if r > 0 and any(enable_lora):
             self.lora_A = nn.Parameter(self.weight.new_zeros((r * sum(enable_lora), in_features)))  # (4, 128)
             self.lora_B = nn.Parameter(
-                self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r)),  # (256, 2)
+                self.weight.new_zeros((out_features // len(enable_lora) * sum(enable_lora), r))  # (256, 2)
             )  # weights for Conv1D with groups=sum(enable_lora)
             # Notes about shapes above
             # - self.lora_A has shape (4, 128): 4 because rank is 2 and LoRA is applied only to two matrices;
@@ -194,8 +188,7 @@ class MergedLinear(nn.Linear, LoRALayer):
             # | query         | key       | value    |
             # ----------------------------------------
             self.lora_ind = self.weight.new_zeros((out_features,), dtype=torch.bool).view(
-                len(enable_lora),
-                -1,
+                len(enable_lora), -1
             )  # (3, 128)
             self.lora_ind[enable_lora, :] = True  # (3, 128)
             self.lora_ind = self.lora_ind.view(-1)  # (384,)
@@ -246,8 +239,7 @@ class MergedLinear(nn.Linear, LoRALayer):
         result = x.new_zeros((*x.shape[:-1], self.out_features))  # (64, 64, 384)
         result = result.view(-1, self.out_features)  # (4096, 384)
         result[:, self.lora_ind] = x.reshape(
-            -1,
-            self.out_features // len(self.enable_lora) * sum(self.enable_lora),
+            -1, self.out_features // len(self.enable_lora) * sum(self.enable_lora)
         )  # (4096, 256)
         return result.view((*x.shape[:-1], self.out_features)).transpose(0, 1)  # (64, 64, 384)
 
@@ -290,7 +282,7 @@ class MergedLinear(nn.Linear, LoRALayer):
                     self.lora_B.data.unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
                     groups=sum(self.enable_lora),
                 ).squeeze(  # (1, 4, 128) @ (256, 2, 1) -> (1, 256, 128)
-                    0,
+                    0
                 )  # (1, 256, 128) -> (256, 128)
                 # -1: W = W - delta_W (unmerge), +1: W = W + delta_W (merge)
                 sign = -1 if mode else 1
@@ -335,8 +327,7 @@ class MergedLinear(nn.Linear, LoRALayer):
             result = F.linear(x, T(self.weight), bias=self.bias)  # (64, 64, 128) @ (384, 128) -> (64, 64, 384)
             if self.r > 0:
                 after_A = F.linear(  # noqa: N806
-                    self.lora_dropout(x),
-                    self.lora_A,
+                    self.lora_dropout(x), self.lora_A
                 )  # (64, 64, 128) @ (4, 128) -> (64, 64, 4)
 
                 # For F.conv1d:
@@ -349,8 +340,7 @@ class MergedLinear(nn.Linear, LoRALayer):
                     self.lora_B.unsqueeze(-1),  # (256, 2) -> (256, 2, 1)
                     groups=sum(self.enable_lora),
                 ).transpose(  # (64, 4, 64) @ (256, 2, 1) -> (64, 256, 64)
-                    -2,
-                    -1,
+                    -2, -1
                 )  # (64, 256, 64) -> (64, 64, 256)
 
                 # (64, 64, 256) after zero_pad (64, 64, 384)

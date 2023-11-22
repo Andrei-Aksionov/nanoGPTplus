@@ -94,7 +94,7 @@ class GPTLanguageModel(nn.Module):
                     use_causal_self_attention=True,
                 )
                 for _ in range(self.num_layers)
-            ],
+            ]
         )
         self.layer_norm_final = LayerNorm(self.embeddings_size, bias=self.bias)  # final layer norm
         self.language_model_head = nn.Linear(self.embeddings_size, self.vocab_size, bias=False)
@@ -114,8 +114,8 @@ class GPTLanguageModel(nn.Module):
         # report number of parameters
         logger.debug(
             "GPT language model is created with number of parameters: {:.2f} million".format(
-                self.__get_parameters_number() / 1e6,
-            ),
+                self.__get_parameters_number() / 1e6
+            )
         )
 
     def __get_parameters_number(self, exclude_positional_embeddings: bool = True) -> int:
@@ -147,13 +147,7 @@ class GPTLanguageModel(nn.Module):
             if hasattr(module, "bias") and module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
 
-    def forward(
-        self,
-        idx: Tensor,
-        *,
-        inference: bool = False,
-        kv_cache: Optional[List[Tensor]] = None,
-    ) -> Tensor:
+    def forward(self, idx: Tensor, *, inference: bool = False, kv_cache: Optional[List[Tensor]] = None) -> Tensor:
         """Do the whole forward pass for decoder part of transformer.
 
         This forward method includes all steps for decoder:
@@ -279,10 +273,7 @@ class GPTLanguageModel(nn.Module):
             tensor with loss value (of how good model's predictions are)
         """
         B, T, C = logits.shape  # noqa: N806
-        return F.cross_entropy(
-            logits.view(B * T, C),
-            targets.view(B * T),
-        )
+        return F.cross_entropy(logits.view(B * T, C), targets.view(B * T))
 
     @classmethod
     def from_pretrained(cls: "GPTLanguageModel", gpt2_type: str) -> "GPTLanguageModel":
@@ -398,7 +389,7 @@ class GPTLanguageModel(nn.Module):
             if source_weights.shape != target_state_dict[target_key].shape:
                 log_error(
                     f"Shape mismatch: shape of source '{source_weights.shape}' and destination - "
-                    f"'{target_state_dict[target_key].shape}'",
+                    f"'{target_state_dict[target_key].shape}'"
                 )
             with torch.no_grad():
                 target_state_dict[target_key].copy_(source_weights)
@@ -473,9 +464,7 @@ class GPTLanguageModel(nn.Module):
                 context = idx[:, -1:]
             # get the predictions
             logits, kv_cache = self(
-                context,
-                inference=True,
-                kv_cache=kv_cache if use_kv_cache else None,
+                context, inference=True, kv_cache=kv_cache if use_kv_cache else None
             )  # (B, T, C), with inference=True -> (1, 1, C)
             # focus only on the last time step and scale by desired temperature
             logits = logits[:, -1, :] / temperature  # becomes (B, C)

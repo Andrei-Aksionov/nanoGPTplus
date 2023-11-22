@@ -5,7 +5,7 @@ import pytest
 from src import config
 
 
-@pytest.mark.smoke
+@pytest.mark.smoke()
 @pytest.mark.order(3)
 class TestTraining:
     @pytest.mark.parametrize("model_size", list(config.model.bigram.size.keys()))
@@ -38,7 +38,7 @@ class TestTraining:
 
 
 # LoRA testing should be done after training without it to not confuse saved checkpoints
-@pytest.mark.smoke
+@pytest.mark.smoke()
 @pytest.mark.order(5)
 # Smoke tests of Low Ranking Adaptation (LoRA)
 class TestTrainingWithLoRA:
