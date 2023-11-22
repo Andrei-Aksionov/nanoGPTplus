@@ -1,7 +1,8 @@
 name: Automatic Code Style Fix
 
-permissions:
-  actions: write
+permissions: write-all
+
+
 on:
   pull_request:
     branches: [main]
