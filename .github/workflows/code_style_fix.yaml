@@ -1,6 +1,12 @@
 name: Automatic Code Style Fix
 
-on: [pull_request, pull_request_target]
+# on: [pull_request, pull_request_target]
+on:
+  workflow_call:
+    secrets:
+      github-token:
+        description: "if provided an user GH's token, it will push update; requires `push` event"
+        required: false
 
 jobs:
   auto_code_style_fix:
