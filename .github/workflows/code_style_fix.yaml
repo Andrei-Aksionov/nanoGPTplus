@@ -31,7 +31,8 @@ jobs:
           fetch-depth: 0
           submodules: recursive
           # token: ${{ secrets.github-token-test || github.token }}
-          token: ${{ secrets.github-token-test }}
+          # token: ${{ secrets.github-token-test }}
+          token: ${{ secrets.MySecret }}
 
       - name: Black ◼️
         uses: psf/black@stable
@@ -61,6 +62,7 @@ jobs:
         uses: actions-js/push@v1.4
         with:
           # github_token: ${{ secrets.github-token || github.token }}
-          github_token: ${{ secrets.github-token-test }}
+          # github_token: ${{ secrets.github-token-test }}
+          github_token: ${{ secrets.MySecret }}
           message: "pre-commit: running and fixing..."
           branch: ${{ github.head_ref || github.ref_name }}
