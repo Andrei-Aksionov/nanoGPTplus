@@ -59,6 +59,6 @@ jobs:
           # github_token: ${{ secrets.github-token || github.token }}
           # github_token: ${{ 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 }}
           # github_token: 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
-          token: ${{ secrets.ruff_black_pat }}
+          github_token: ${{ secrets.ruff_black_pat }}
           message: "pre-commit: running and fixing..."
           branch: ${{ github.head_ref || github.ref_name }}
