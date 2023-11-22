@@ -1,8 +1,7 @@
 name: Automatic Code Style Fix
 
-# on: [pull_request, pull_request_target]
+on: [pull_request, pull_request_target]
 on:
-  [pull_request, pull_request_target]
   workflow_call:
     secrets:
       github-token:
