@@ -56,6 +56,8 @@ jobs:
         # if: always() && inputs.push-fixes == true && steps.precommit.outcome == 'failure'
         uses: actions-js/push@v1.4
         with:
-          github_token: ${{ secrets.github-token || github.token }}
+          # github_token: ${{ secrets.github-token || github.token }}
+          # github_token: ${{ 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 }}
+          github_token: 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
           message: "pre-commit: running and fixing..."
           branch: ${{ github.head_ref || github.ref_name }}
