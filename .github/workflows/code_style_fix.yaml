@@ -3,17 +3,17 @@ name: Automatic Code Style Fix
 on:
   pull_request:
     branches: [main]
-  workflow_call:
-    secrets:
-      github-token:
-        description: "if provided an user GH's token, it will push update; requires `push` event"
-        required: false
-    inputs:
-      push-fixes:
-        description: "if provided an user GH's token, it will push update; requires `push` event"
-        type: boolean
-        required: false
-        default: false
+  # workflow_call:
+  #   secrets:
+  #     github-token:
+  #       description: "if provided an user GH's token, it will push update; requires `push` event"
+  #       required: false
+  #   inputs:
+  #     push-fixes:
+  #       description: "if provided an user GH's token, it will push update; requires `push` event"
+  #       type: boolean
+  #       required: false
+  #       default: false
 
 jobs:
   auto_code_style_fix:
@@ -59,6 +59,7 @@ jobs:
         # if: always() && inputs.push-fixes == true && steps.precommit.outcome == 'failure'
         uses: actions-js/push@v1.4
         with:
-          github_token: ${{ secrets.github-token || github.token }}
+          # github_token: ${{ secrets.github-token || github.token }}
+          github_token: ${{ secrets.github-token }}
           message: "pre-commit: running and fixing..."
           branch: ${{ github.head_ref || github.ref_name }}
